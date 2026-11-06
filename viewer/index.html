@@ -1054,6 +1054,22 @@ function setCam(px, py, pz, tx, ty, tz) {
   controls.target.set(tx, ty, tz);
   controls.update();
 }
+// 再取得・自動更新のときは、ユーザーのカメラ位置（回転・ズーム）を引き継ぐ
+function switchViewKeepingCamera(key) {
+  const p = camera.position.clone();
+  const t = controls.target.clone();
+  switchView(key);
+  camera.position.copy(p);
+  controls.target.copy(t);
+  // ドラッグ直後に残っている慣性（減衰中の回転量）を一度だけ適用して消し、復元し直す。
+  // 同期処理の中なので、この途中の状態が画面に出ることはない
+  controls.enableDamping = false;
+  controls.update();
+  camera.position.copy(p);
+  controls.target.copy(t);
+  controls.update();
+  controls.enableDamping = true;
+}
 function packBuilding() {
   const rooms = visibleRooms();
   const cells = [];
@@ -1263,7 +1279,7 @@ function showDetail(info, anchorWorld) {
     prow.style.display = 'none';
   }
   const asec = document.getElementById('dAskSec');
-  if (info.ask) {
+  if (info.ask && info.status === 'waiting_approval') {
     asec.style.display = '';
     document.getElementById('dAsk').textContent = info.ask;
   } else {
@@ -2252,7 +2268,7 @@ async function refreshData() {
     hideErrorBanner();
     normalizeLayouts();
     buildTabs();
-    switchView(currentViewKey);
+    switchViewKeepingCamera(currentViewKey);
     if (settingsEl.classList.contains('open')) renderSettings();
     showToast('最新のデータを取得しました');
   } catch (e) {
@@ -2288,7 +2304,7 @@ async function autoRefreshTick() {
     hideErrorBanner();
     normalizeLayouts();
     buildTabs();
-    switchView(currentViewKey);
+    switchViewKeepingCamera(currentViewKey);
     if (openNum) {
       const iss = ISSUES.find(i => i.number === openNum);
       if (iss) showDetail(infoOf(iss), { x: 0, z: 0 });
