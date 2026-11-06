@@ -73,12 +73,22 @@ function parseBody(body) {
   const fields = {};
   if (!body) return fields;
   let current = null;
+  const headingField = new RegExp(`^#{1,6}\\s*(${BODY_FIELDS.join('|')})(?:（.*）|\\(.*\\))?\\s*$`);
   for (const line of body.split('\n')) {
     const m = line.match(new RegExp(`^(${BODY_FIELDS.join('|')})[：:]\\s?(.*)$`));
     if (m) {
       current = m[1];
       fields[current] = m[2];
-    } else if (line.startsWith('#')) {
+      continue;
+    }
+    const h = line.match(headingField);
+    if (h) {
+      // 見出し形式（## 担当 の次の行が値）にも対応する
+      current = h[1];
+      if (fields[current] === undefined) fields[current] = '';
+      continue;
+    }
+    if (line.startsWith('#')) {
       current = null;
     } else if (current) {
       fields[current] = (fields[current] + '\n' + line).trim();
