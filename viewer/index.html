@@ -242,7 +242,7 @@
 </div>
 <div class="panel">
   <b>TinyCompany</b>
-  <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">🔄 再取得</button></div>
+  <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">🔄 再取得</button><span id="updatedAt" style="margin-left:8px;color:#8a938e;font-size:11px"></span></div>
   <div id="legend"></div>
   <div id="modeToggle">
     <button id="mode3d" class="on">🏢 3D</button>
@@ -2196,15 +2196,21 @@ function convertSettings(raw) {
   }
   return s;
 }
+let lastDataJson = null;
 async function loadCompany() {
   const cfg = window.TCGitHub && TCGitHub.getConfig();
   if (!cfg) throw new Error('not connected');
   const data = await TCGitHub.loadCompany(cfg);
+  lastDataJson = JSON.stringify(data);
   SETTINGS = convertSettings(data.settings || {});
   BUILDING = data.building || BUILDING;
   LAYOUTS = data.layouts || {};
   ISSUES = (data.issues || []).map(i => ({ ...i, bucho: i.seat === 'bucho' }));
   REPO_NAME = data.repo || null;
+}
+function stampUpdated() {
+  const el = document.getElementById('updatedAt');
+  if (el) el.textContent = '自動更新 ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }
 function normalizeLayouts() {
   for (const id of Object.keys(LAYOUTS)) LAYOUTS[id] = effectiveLayout(id);
@@ -2217,6 +2223,7 @@ function boot() {
 async function refreshData() {
   try {
     await loadCompany();
+    stampUpdated();
     document.getElementById('repoName').textContent = REPO_NAME || 'デモデータ';
     hideErrorBanner();
     normalizeLayouts();
@@ -2229,6 +2236,38 @@ async function refreshData() {
   }
 }
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
+// ===== 自動更新（60秒ごと。変更があったときだけ静かに再描画する） =====
+let autoRefreshing = false;
+async function autoRefreshTick() {
+  if (autoRefreshing || document.hidden) return;
+  const cfg = window.TCGitHub && TCGitHub.getConfig();
+  if (!cfg) return;
+  // 編集中・設定・接続・詳細を開いている間は邪魔しない
+  if (editMode) return;
+  if (settingsEl.classList.contains('open')) return;
+  if (connectOverlay.classList.contains('open')) return;
+  if (detail.classList.contains('open')) return;
+  autoRefreshing = true;
+  try {
+    const data = await TCGitHub.loadCompany(cfg);
+    stampUpdated();
+    if (JSON.stringify(data) === lastDataJson) return;
+    lastDataJson = JSON.stringify(data);
+    SETTINGS = convertSettings(data.settings || {});
+    BUILDING = data.building || BUILDING;
+    LAYOUTS = data.layouts || {};
+    ISSUES = (data.issues || []).map(i => ({ ...i, bucho: i.seat === 'bucho' }));
+    REPO_NAME = data.repo || null;
+    document.getElementById('repoName').textContent = REPO_NAME || 'デモデータ';
+    hideErrorBanner();
+    normalizeLayouts();
+    buildTabs();
+    switchView(currentViewKey);
+  } catch (e) { /* 自動更新の失敗は静かに無視する（手動の再取得で確認できる） */ }
+  finally { autoRefreshing = false; }
+}
+window.autoRefreshTick = autoRefreshTick;
+setInterval(autoRefreshTick, 60000);
 // ===== 接続パネル =====
 const connectOverlay = document.getElementById('connectOverlay');
 const connInfoEl = document.getElementById('connInfo');
