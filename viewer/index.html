@@ -640,7 +640,7 @@ function plateSprite(name, title, gold = false) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#57482c';
   ctx.font = '600 58px system-ui, sans-serif';
-  ctx.fillText(name, 440, 84);
+  ctx.fillText(name == null ? '' : String(name), 440, 84);
   ctx.fillStyle = '#26322f';
   let fs = 84;
   ctx.font = `700 ${fs}px system-ui, sans-serif`;
@@ -732,8 +732,9 @@ function issueDepth(issue) {
   return d;
 }
 function infoOf(issue) {
+  const seatDef = SETTINGS.seats && SETTINGS.seats[issue.seat];
   return {
-    name: issue.assignee, role: issue.seat, title: issue.title,
+    name: issue.assignee || (seatDef && seatDef.display) || '', role: issue.seat, title: issue.title,
     status: issue.status, out: issue.out, ask: issue.ask, number: issue.number
   };
 }
