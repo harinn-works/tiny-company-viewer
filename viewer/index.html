@@ -49,6 +49,8 @@
     flex:1; text-align:center; text-decoration:none; font-weight:600;
     background:#eef3f0; color:#3f4a4a; border-radius:9px; padding:7px 0;
   }
+  #detail .btns { flex-wrap:wrap; }
+  #detail .btns a.primary { background:#1D76DB; color:#fff; }
   #detail .sec { margin-top:12px; border:1px solid #e3e8e3; border-radius:10px; padding:8px 11px; background:#fbfcfb; line-height:1.65; }
   #detail .sec .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
   #detail .sec.ask { border-color:#f0c6c0; background:#fdf1ef; }
@@ -272,6 +274,7 @@
   <div class="row"><b>状態</b><span id="dStatus"></span></div>
   <div class="row"><b>担当</b><span id="dName"></span></div>
   <div class="row"><b>Issue</b><span id="dIssueNum"></span></div>
+  <div class="row"><b>最終更新</b><span id="dUpdated"></span></div>
   <div class="row" id="dParentRow" style="display:none"><b>親</b><span id="dParent"></span></div>
   <div class="row" id="dProgRow" style="display:none"><b>子Issue</b><span id="dProg"></span></div>
   <div class="row"><b>成果物</b><span id="dOut"></span></div>
@@ -281,6 +284,7 @@
   <div class="btns">
     <a href="#" id="dIssue">Issueを開く</a>
     <a href="#" id="dChat">チャットを開く</a>
+    <a href="#" id="dParentChat" style="display:none">報告先のチャットを開く</a>
   </div>
 </div>
 
@@ -1278,6 +1282,25 @@ function showDetail(info, anchorWorld) {
   } else {
     prow.style.display = 'none';
   }
+  document.getElementById('dUpdated').textContent =
+    issue && issue.updatedAt ? fmtUpdated(issue.updatedAt) : '—';
+  const pcBtn = document.getElementById('dParentChat');
+  const pIssue2 = issue && issue.parent ? issueByNum(issue.parent) : null;
+  const rtChat = issue && issue.reportTo && issue.reportTo.chat ? issue.reportTo.chat : null;
+  const pChat = pIssue2 && pIssue2.chat && pIssue2.chat.url ? pIssue2.chat.url : null;
+  const targetChat = rtChat || pChat;
+  if (targetChat && issue) {
+    pcBtn.style.display = '';
+    pcBtn.dataset.url = targetChat;
+    pcBtn.dataset.copy = info.status === 'waiting_review'
+      ? `Issue #${issue.number}「${issue.title}」の作業が完了しました。報告書を確認してください。`
+      : `Issue #${issue.number}「${issue.title}」について連絡します。`;
+    pcBtn.classList.toggle('primary', info.status === 'waiting_review');
+    pcBtn.textContent = '報告先のチャットを開く';
+  } else {
+    pcBtn.style.display = 'none';
+    delete pcBtn.dataset.url;
+  }
   const asec = document.getElementById('dAskSec');
   if (info.ask && info.status === 'waiting_approval') {
     asec.style.display = '';
@@ -1530,6 +1553,34 @@ renderer.domElement.addEventListener('dblclick', e => {
     const hits = raycaster.intersectObjects(clickables, true);
     if (!hits.length) switchView('all');
   }
+});
+
+// 最終更新の表示（日時＋経過）
+function fmtUpdated(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  const base = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const mins = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+  const rel = mins < 1 ? 'たった今' : mins < 60 ? `${mins}分前` : mins < 1440 ? `${Math.floor(mins / 60)}時間前` : `${Math.floor(mins / 1440)}日前`;
+  return `${base}（${rel}）`;
+}
+// 報告先のチャットを開く（開く＋依頼文をクリップボードへ）
+document.getElementById('dParentChat').addEventListener('click', async e => {
+  e.preventDefault();
+  const btn = e.currentTarget;
+  const url = btn.dataset.url;
+  if (!url) return;
+  const text = btn.dataset.copy || '';
+  try { await navigator.clipboard.writeText(text); } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (__) {}
+    ta.remove();
+  }
+  window.open(url, '_blank', 'noopener');
+  btn.textContent = '開きました（依頼文コピー済み）';
+  setTimeout(() => { btn.textContent = '報告先のチャットを開く'; }, 1800);
 });
 
 // チャット参照（構造化）: URLがある場合だけボタンを出す
