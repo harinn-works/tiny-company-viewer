@@ -1,0 +1,12 @@
+services:
+  viewer:
+    build: .
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      COMPANY_REPO: ${COMPANY_REPO}
+      HOST: 0.0.0.0
+      PORT: 8787
+    ports:
+      # ホスト側も localhost のみに公開する（外部公開しない前提）
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped
