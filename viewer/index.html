@@ -2236,7 +2236,7 @@ async function refreshData() {
   }
 }
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
-// ===== 自動更新（60秒ごと。変更があったときだけ静かに再描画する） =====
+// ===== 自動更新（30秒ごと。変更があったときだけ静かに再描画する） =====
 let autoRefreshing = false;
 async function autoRefreshTick() {
   if (autoRefreshing || document.hidden) return;
@@ -2267,7 +2267,7 @@ async function autoRefreshTick() {
   finally { autoRefreshing = false; }
 }
 window.autoRefreshTick = autoRefreshTick;
-setInterval(autoRefreshTick, 60000);
+setInterval(autoRefreshTick, 30000);
 // ===== 接続パネル =====
 const connectOverlay = document.getElementById('connectOverlay');
 const connInfoEl = document.getElementById('connInfo');
