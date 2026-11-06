@@ -233,6 +233,34 @@
     };
   }
 
+  // ---------- 変更の見張り（ETag の条件付きリクエスト） ----------
+  // 「変更なし（304）」の応答は GitHub の回数制限に数えられないため、
+  // 数秒ごとに軽く確認して、変わったときだけ loadCompany を呼ぶための仕組み。
+  const probeEtags = {};
+  async function probeOne(cfg, key, pathname) {
+    // 初回は必ず不一致になる値を送って 200 を受け取り、ETag を基準として記録する。
+    // （ヘッダーを送らないとブラウザが自身のキャッシュの ETag で再検証してしまい、
+    //   こちらの基準とずれて変更を取りこぼすため）
+    const headers = { 'If-None-Match': probeEtags[key] || '"tc-prime-none"' };
+    let r;
+    try {
+      r = await gh(cfg, pathname, { headers, cache: 'no-cache' });
+    } catch (e) { return false; }
+    if (r.status === 304) return false;
+    if (!r.ok) return false;
+    const et = r.headers.get('ETag');
+    const had = Object.prototype.hasOwnProperty.call(probeEtags, key);
+    if (et) probeEtags[key] = et;
+    return had; // 初回は基準（ETag の記録）作りのみで、変更とはみなさない
+  }
+  async function probeChanges(cfg) {
+    const issuesChanged = await probeOne(cfg, cfg.repo + '|issues',
+      `/repos/${cfg.repo}/issues?state=all&per_page=100`);
+    const headChanged = await probeOne(cfg, cfg.repo + '|head',
+      `/repos/${cfg.repo}/commits?per_page=1`);
+    return issuesChanged || headChanged;
+  }
+
   // ---------- 保存（server.mjs の POST /api/files と同じ制限） ----------
   const WRITE_OK = /^board\/(settings|building)\.json$|^rooms\/[A-Za-z0-9._-]+\/layout\.json$/;
   async function saveFile(cfg, filePath, content) {
@@ -256,5 +284,5 @@
     return true;
   }
 
-  window.TCGitHub = { getConfig, saveConfig, clearConfig, loadCompany, saveFile, validate };
+  window.TCGitHub = { getConfig, saveConfig, clearConfig, loadCompany, saveFile, validate, probeChanges };
 })();
