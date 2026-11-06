@@ -1,0 +1,80 @@
+[
+ {
+  "number": 1,
+  "title": "社長室（常設）",
+  "state": "open",
+  "labels": [
+   {
+    "name": "seat:総監督"
+   }
+  ],
+  "body": "役割：総監督\n\n会社全体の見取り図と将来の計画を保持する常設 Issue。",
+  "html_url": "https://github.com/example/sample-company/issues/1",
+  "user": {
+   "login": "sample-ai"
+  }
+ },
+ {
+  "number": 2,
+  "title": "サンプル室の管理",
+  "state": "open",
+  "labels": [
+   {
+    "name": "seat:部長"
+   },
+   {
+    "name": "room:lab"
+   },
+   {
+    "name": "status:作業中"
+   }
+  ],
+  "body": "担当：Muse（部長）\nチャット：サンプルチャット\n親：なし\nやること：サンプル室の作業計画と配下の一次確認\n成果物：なし（管理Issue）\n承認待ちの内容：なし\n報告先：本人\n報告文：",
+  "html_url": "https://github.com/example/sample-company/issues/2",
+  "user": {
+   "login": "sample-ai"
+  }
+ },
+ {
+  "number": 3,
+  "title": "サンプルの調査タスク",
+  "state": "open",
+  "labels": [
+   {
+    "name": "seat:部下"
+   },
+   {
+    "name": "room:lab"
+   },
+   {
+    "name": "status:確認待ち"
+   }
+  ],
+  "body": "担当：Codex（部下役）\nチャット：サンプルチャット\n親：#2\nやること：サンプルの調査\n成果物：rooms/lab/work/sample/REPORT.md\n承認待ちの内容：なし\n報告先：親 #2 のチャット（部長）\n報告文：サンプルの調査が終わりました。成果物は rooms/lab/work/sample/REPORT.md です。",
+  "html_url": "https://github.com/example/sample-company/issues/3",
+  "user": {
+   "login": "sample-ai"
+  }
+ },
+ {
+  "number": 4,
+  "title": "サンプルの執筆タスク",
+  "state": "open",
+  "labels": [
+   {
+    "name": "seat:部下"
+   },
+   {
+    "name": "room:lab"
+   },
+   {
+    "name": "status:未着手"
+   }
+  ],
+  "body": "担当：ChatGPT（部下役）\nチャット：サンプルチャット\n親：#2\nやること：サンプルの執筆\n成果物：rooms/lab/work/sample2/REPORT.md\n承認待ちの内容：なし\n報告先：親 #2 のチャット（部長）\n報告文：",
+  "html_url": "https://github.com/example/sample-company/issues/4",
+  "user": {
+   "login": "sample-ai"
+  }
+ }
+]
