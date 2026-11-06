@@ -13,6 +13,12 @@
     box-shadow:0 2px 10px rgba(0,0,0,.08); line-height:1.7; max-width:308px;
   }
   .panel b { font-size:14px; }
+  .panelHead { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  #panelToggle {
+    border:none; cursor:pointer; background:#eef3f0; color:#3f4a4a; flex:none;
+    border-radius:8px; width:26px; height:26px; font-size:14px; font-weight:700; line-height:1;
+  }
+  .panel.mini .panelBody { display:none; }
   .dot { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
   .lgScope { font-size:11.5px; color:#7d8a8a; margin:3px 0 2px; }
   .lgRow { display:flex; align-items:center; line-height:1.85; }
@@ -122,7 +128,8 @@
     background:#f4f1ea; padding:64px 14px 14px; box-sizing:border-box;
     overflow:hidden; flex-direction:column;
   }
-  #boardBar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; margin-left:336px; }
+  #boardBar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; margin-left:336px; transition:margin-left .28s ease; }
+  body.panel-mini #boardBar, body.panel-mini #boardScroll { margin-left:0; }
   #boardBar .chip {
     border:none; cursor:pointer; font-size:13px; font-weight:600;
     padding:6px 14px; border-radius:999px; background:#fff; color:#3f4a4a;
@@ -156,7 +163,7 @@
   .projGroup h3 { margin:2px 4px 10px; font-size:14px; color:#3f4a4a; }
   .projGroup .cards { display:flex; flex-wrap:wrap; gap:10px; }
   .projGroup .sticky { width:230px; margin-bottom:0; }
-  #boardScroll { flex:1; overflow:auto; }
+  #boardScroll { flex:1; overflow:auto; margin-left:336px; transition:margin-left .28s ease; }
   #repoBar { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:12px; color:#7d8a8a; }
   #repoBar #repoName { font-weight:600; word-break:break-all; }
   #refreshBtn {
@@ -240,13 +247,15 @@
     <p class="connectHelp">トークンの作り方：GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で、対象の会社リポジトリだけを選び、Repository permissions の Issues と Contents を Read and write にします。PC ごとにトークンを分けると、不要になった PC の分だけを消せて安全です。</p>
   </div>
 </div>
-<div class="panel">
-  <b>TinyCompany</b>
+<div class="panel" id="infoPanel">
+  <div class="panelHead"><b>TinyCompany</b><button id="panelToggle" title="パネルを畳む／開く">－</button></div>
+  <div class="panelBody">
   <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">🔄 再取得</button><span id="updatedAt" style="margin-left:8px;color:#8a938e;font-size:11px"></span></div>
   <div id="legend"></div>
   <div id="modeToggle">
     <button id="mode3d" class="on">🏢 3D</button>
     <button id="modeBoard">📌 付箋一覧</button>
+  </div>
   </div>
 </div>
 <div id="board">
@@ -1486,6 +1495,8 @@ renderer.domElement.addEventListener('pointerup', e => {
       return;
     }
   }
+  // 人物以外（空き場所）をクリックしたら詳細を閉じる
+  closeDetail();
 });
 
 renderer.domElement.addEventListener('dblclick', e => {
@@ -2129,6 +2140,8 @@ function setViewMode(m) {
   document.getElementById('modeBoard').classList.toggle('on', m === 'board');
   const isBoard = m === 'board';
   boardEl.style.display = isBoard ? 'flex' : 'none';
+  // 付箋一覧では上部の部屋タブを隠す（絞り込みはボード側のチップと重複するため）
+  document.getElementById('tabs').style.display = isBoard ? 'none' : '';
   editToggle.style.display = isBoard ? 'none' : '';
   if (isBoard) {
     if (editMode) setEditMode(false);
@@ -2140,6 +2153,17 @@ function setViewMode(m) {
 }
 document.getElementById('mode3d').addEventListener('click', () => setViewMode('3d'));
 document.getElementById('modeBoard').addEventListener('click', () => setViewMode('board'));
+// 会社情報パネルの開閉（畳むとボードの左オフセットも外れる）
+document.getElementById('panelToggle').addEventListener('click', () => {
+  const panel = document.getElementById('infoPanel');
+  const mini = panel.classList.toggle('mini');
+  document.body.classList.toggle('panel-mini', mini);
+  document.getElementById('panelToggle').textContent = mini ? '＋' : '－';
+});
+// 付箋一覧で付箋以外の場所をクリックしたら詳細を閉じる
+document.getElementById('boardScroll').addEventListener('click', e => {
+  if (!e.target.closest('.sticky')) closeDetail();
+});
 
 // ===== アニメーション =====
 const clockT = new THREE.Clock();
