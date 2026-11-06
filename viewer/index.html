@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>エージェント作業ボード 試作ビューア v21（階層の追加・削除）</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:#eef0ee; font-family: system-ui, sans-serif; }
+  #app { position:fixed; inset:0; transition:right .28s ease; }
+  .panel {
+    position:fixed; left:12px; top:12px; z-index:8; background:rgba(255,255,255,.9);
+    border-radius:12px; padding:10px 14px; font-size:13px; color:#3f4a4a;
+    box-shadow:0 2px 10px rgba(0,0,0,.08); line-height:1.7; max-width:308px;
+  }
+  .panel b { font-size:14px; }
+  .dot { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
+  .lgScope { font-size:11.5px; color:#7d8a8a; margin:3px 0 2px; }
+  .lgRow { display:flex; align-items:center; line-height:1.85; }
+  .lgNum { margin-left:auto; font-weight:700; padding-left:16px; }
+  .hint { position:fixed; right:12px; bottom:10px; font-size:12px; color:#7d8a8a; }
+  #tabs {
+    position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:8;
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:96vw;
+  }
+  #tabs button {
+    border:none; cursor:pointer; font-size:14px; font-weight:600;
+    padding:9px 18px; border-radius:999px; color:#3f4a4a;
+    background:rgba(255,255,255,.85); box-shadow:0 2px 8px rgba(0,0,0,.08);
+  }
+  #tabs button.on { background:#3f4a4a; color:#fff; }
+  #tabs button.archived { opacity:.45; text-decoration:line-through; }
+  #detail {
+    position:fixed; top:0; right:0; bottom:0; width:352px; max-width:92vw;
+    background:rgba(255,255,255,.97); border-radius:0; padding:20px 20px 16px;
+    box-shadow:-8px 0 28px rgba(0,0,0,.16); color:#3f4a4a; font-size:13.5px; line-height:1.8;
+    z-index:9; transform:translateX(105%); transition:transform .28s ease; overflow-y:auto;
+  }
+  #detail.open { transform:none; }
+  #detail .ttl { font-size:15px; font-weight:700; line-height:1.45; }
+  #detail .row b { display:inline-block; width:58px; color:#7d8a8a; font-weight:600; }
+  #detail .btns { margin-top:10px; display:flex; gap:8px; }
+  #detail .btns a {
+    flex:1; text-align:center; text-decoration:none; font-weight:600;
+    background:#eef3f0; color:#3f4a4a; border-radius:9px; padding:7px 0;
+  }
+  #detail .sec { margin-top:12px; border:1px solid #e3e8e3; border-radius:10px; padding:8px 11px; background:#fbfcfb; line-height:1.65; }
+  #detail .sec .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
+  #detail .sec.ask { border-color:#f0c6c0; background:#fdf1ef; }
+  #detail .sec.ask .secT { color:#b60205; }
+  #detail .secSub { font-size:12px; color:#7d8a8a; margin-top:4px; }
+  #detail a.lnk { color:#1d76db; text-decoration:underline; }
+  #detail .close {
+    position:absolute; top:8px; right:12px; border:none; background:none;
+    font-size:16px; color:#7d8a8a; cursor:pointer;
+  }
+  #settingsToggle {
+    position:fixed; right:186px; top:12px; z-index:6;
+    border:none; cursor:pointer; font-size:14px; font-weight:600;
+    padding:9px 16px; border-radius:999px; color:#3f4a4a;
+    background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
+  }
+  #settings {
+    position:fixed; top:0; right:0; bottom:0; width:320px; max-width:92vw;
+    background:rgba(255,255,255,.97); padding:20px 20px 16px;
+    box-shadow:-8px 0 28px rgba(0,0,0,.16); color:#3f4a4a; font-size:13.5px; line-height:1.7;
+    z-index:10; transform:translateX(105%); transition:transform .28s ease; overflow-y:auto;
+  }
+  #settings.open { transform:none; }
+  #settings .ttl { font-size:15px; font-weight:700; }
+  #settings .close {
+    position:absolute; top:8px; right:12px; border:none; background:none;
+    font-size:16px; color:#7d8a8a; cursor:pointer;
+  }
+  #settings h3 { font-size:12.5px; margin:16px 0 6px; color:#7d8a8a; }
+  #settings .srow { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  #settings .srow input[type="color"] { width:38px; height:26px; border:none; background:none; padding:0; cursor:pointer; flex:none; }
+  #settings .srow input[type="text"] { flex:1; min-width:0; font-size:13px; padding:5px 8px; border:1px solid #d8ded8; border-radius:7px; }
+  #settings .skey { width:52px; flex:none; color:#7d8a8a; font-size:12px; }
+  #settings .btns { margin-top:16px; display:flex; gap:8px; }
+  #settings .btns button {
+    flex:1; border:none; cursor:pointer; text-align:center; font-weight:600; font-size:13.5px;
+    background:#3f4a4a; color:#fff; border-radius:9px; padding:8px 0;
+  }
+  #settings .addTier {
+    width:100%; margin-top:2px; padding:6px 0; cursor:pointer;
+    border:1.5px dashed #c3ccc3; border-radius:8px; background:none;
+    color:#3f4a4a; font-size:12.5px; font-weight:600;
+  }
+  #settings .addTier:disabled { color:#aab5b5; cursor:default; }
+  #settings .sdel {
+    flex:none; border:none; background:none; cursor:pointer;
+    color:#b0564a; font-size:12px; padding:2px 4px;
+  }
+  #settings .note { font-size:11px; color:#7d8a8a; line-height:1.6; margin-top:10px; }
+  #editToggle {
+    position:fixed; right:12px; top:12px; z-index:6;
+    border:none; cursor:pointer; font-size:14px; font-weight:600;
+    padding:9px 16px; border-radius:999px; color:#3f4a4a;
+    background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
+  }
+  #editToggle.on { background:#d9a441; color:#fff; }
+  #editbar {
+    position:fixed; right:12px; top:58px; z-index:6; display:none;
+    background:rgba(255,255,255,.95); border-radius:12px; padding:10px;
+    box-shadow:0 4px 16px rgba(0,0,0,.12); width:184px;
+  }
+  #editbar button {
+    display:block; width:100%; margin-bottom:6px; border:none; cursor:pointer;
+    font-size:13px; font-weight:600; padding:8px 0; border-radius:8px;
+    background:#eef3f0; color:#3f4a4a;
+  }
+  #editbar .note { font-size:11px; color:#7d8a8a; line-height:1.5; }
+  #editbar .sep { border-top:1px solid #e3e8e3; margin:8px 0; }
+  #modeToggle { margin-top:8px; display:flex; gap:6px; }
+  #modeToggle button {
+    flex:1; border:none; cursor:pointer; font-size:13px; font-weight:700;
+    padding:7px 0; border-radius:8px; background:#eef3f0; color:#3f4a4a;
+  }
+  #modeToggle button.on { background:#3f4a4a; color:#fff; }
+  #board {
+    position:fixed; inset:0; z-index:3; display:none;
+    background:#f4f1ea; padding:64px 14px 14px; box-sizing:border-box;
+    overflow:hidden; flex-direction:column;
+  }
+  #boardBar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; margin-left:336px; }
+  #boardBar .chip {
+    border:none; cursor:pointer; font-size:13px; font-weight:600;
+    padding:6px 14px; border-radius:999px; background:#fff; color:#3f4a4a;
+    box-shadow:0 1px 4px rgba(0,0,0,.08);
+  }
+  #boardBar .chip.on { background:#3f4a4a; color:#fff; }
+  #boardBar .spacer { flex:1; }
+  #lanes { display:flex; gap:12px; flex:1; overflow-x:auto; align-items:flex-start; }
+  .lane {
+    flex:1 0 240px; max-width:340px; background:rgba(255,255,255,.55);
+    border-radius:14px; padding:10px; min-height:200px;
+  }
+  .lane.over { outline:3px dashed #d9a441; outline-offset:-3px; }
+  .lane h3 { margin:2px 4px 10px; font-size:14px; color:#3f4a4a; }
+  .lane h3 .cnt { color:#7d8a8a; font-weight:600; }
+  .sticky {
+    background:#fffbe8; border-radius:6px; padding:9px 11px; margin-bottom:9px;
+    box-shadow:0 2px 6px rgba(0,0,0,.13); cursor:grab; font-size:12.5px;
+    color:#3f4a4a; line-height:1.55; border-top:6px solid #ccc;
+  }
+  .sticky:nth-child(odd) { transform:rotate(-.4deg); }
+  .sticky:nth-child(even) { transform:rotate(.4deg); }
+  .sticky .ttl { font-weight:700; font-size:13.5px; line-height:1.45; }
+  .sticky .meta { color:#7d8a8a; font-size:11.5px; }
+  .sticky .ask { color:#B60205; font-weight:600; }
+  .sticky .roomTag {
+    display:inline-block; font-size:10.5px; font-weight:700; color:#fff;
+    border-radius:4px; padding:1px 6px; margin-bottom:4px;
+  }
+  .projGroup { margin-bottom:16px; }
+  .projGroup h3 { margin:2px 4px 10px; font-size:14px; color:#3f4a4a; }
+  .projGroup .cards { display:flex; flex-wrap:wrap; gap:10px; }
+  .projGroup .sticky { width:230px; margin-bottom:0; }
+  #boardScroll { flex:1; overflow:auto; }
+  #repoBar { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:12px; color:#7d8a8a; }
+  #repoBar #repoName { font-weight:600; word-break:break-all; }
+  #refreshBtn {
+    border:none; cursor:pointer; background:#eef3f0; color:#3f4a4a;
+    border-radius:8px; padding:3px 10px; font-size:12px; font-weight:600; flex:none;
+  }
+  #errBanner {
+    position:fixed; top:60px; left:50%; transform:translateX(-50%); z-index:20;
+    background:#fdf1ef; border:1px solid #f0c6c0; color:#b60205;
+    padding:8px 16px; border-radius:10px; font-size:13px; display:none;
+    box-shadow:0 2px 10px rgba(0,0,0,.1); max-width:92vw;
+  }
+  #toast {
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%); z-index:30;
+    background:rgba(63,74,74,.94); color:#fff; padding:8px 18px; border-radius:999px;
+    font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .25s ease;
+    max-width:92vw; text-align:center;
+  }
+  #toast.show { opacity:1; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/vendor/three.module.js",
+    "three/addons/": "/vendor/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="tabs"></div>
+<div id="errBanner"></div>
+<div id="toast"></div>
+<div class="panel">
+  <b>TinyCompany</b>
+  <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">🔄 再取得</button></div>
+  <div id="legend"></div>
+  <div id="modeToggle">
+    <button id="mode3d" class="on">🏢 3D</button>
+    <button id="modeBoard">📌 付箋一覧</button>
+  </div>
+</div>
+<div id="board">
+  <div id="boardBar"></div>
+  <div id="boardScroll"><div id="lanes"></div></div>
+</div>
+<div class="hint" id="hint">ドラッグで回転 / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ</div>
+<button id="settingsToggle">⚙️ 設定</button>
+<button id="editToggle">✏️ 編集モード</button>
+<div id="editbar"></div>
+<div id="detail">
+  <button class="close" id="detailClose">✕</button>
+  <div class="ttl" id="dTitle"></div>
+  <div class="row"><b>状態</b><span id="dStatus"></span></div>
+  <div class="row"><b>担当</b><span id="dName"></span></div>
+  <div class="row"><b>Issue</b><span id="dIssueNum"></span></div>
+  <div class="row" id="dParentRow" style="display:none"><b>親</b><span id="dParent"></span></div>
+  <div class="row" id="dProgRow" style="display:none"><b>子Issue</b><span id="dProg"></span></div>
+  <div class="row"><b>成果物</b><span id="dOut"></span></div>
+  <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
+  <div class="sec" id="dReportSec" style="display:none"><div class="secT">報告</div><div id="dReport"></div><div class="secSub" id="dReportTo"></div></div>
+  <div class="sec" id="dCheckSec" style="display:none"><div class="secT" id="dCheckT">一次確認</div><div id="dCheckRec"></div><div id="dCheckCon"></div></div>
+  <div class="btns">
+    <a href="#" id="dIssue">Issueを開く</a>
+    <a href="#" id="dChat">チャットを開く</a>
+  </div>
+</div>
+
+<div id="settings">
+  <button class="close" id="settingsClose">✕</button>
+  <div class="ttl">設定</div>
+  <div id="settingsBody"></div>
+  <div class="btns">
+    <button id="settingsSave">settings.json保存</button>
+  </div>
+  <div class="note">変更は凡例へすぐ、3D表示へは少し遅れて反映されます。「settings.json保存」でサーバー経由でリポジトリの board/settings.json に保存されます（失敗した場合はダウンロードになります）。ラベル名そのものは意味キーとして固定です。</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+// ===== データ（実ファイルと同じ形式のデモ。実データ取得に成功したら差し替える） =====
+let SETTINGS = {
+  statuses: {
+    not_started:      { label: 'status:未着手',   display: '未着手',   color: 0x9AA5A0 },
+    working:          { label: 'status:作業中',   display: '作業中',   color: 0x0E8A16 },
+    waiting_approval: { label: 'status:承認待ち', display: '承認待ち', color: 0xB60205 },
+    waiting_review:   { label: 'status:確認待ち', display: '確認待ち', color: 0x1D76DB }
+  },
+  seats: {
+    director:  { label: 'seat:総監督', display: '総監督' },
+    bucho:     { label: 'seat:部長',   display: '部長' },
+    secretary: { label: 'seat:秘書',   display: '秘書' },
+    member:    { label: 'seat:部下',   display: '部下' }
+  },
+  tiers: {
+    director: { name: '社長', color: 0x243447 },
+    '0':      { name: '部長', color: 0x35507A },
+    default:  { name: '部下', color: 0xA9BFD2 }
+  },
+  labelPrefixes: { role: 'role:', room: 'room:' }
+};
+let BUILDING = {
+  version: 2,
+  director: { issue: 101 },
+  rooms: [
+    { id: 'lp',        name: 'LP制作',        slot: 0, archived: false },
+    { id: 'housetodo', name: 'HouseToDo開発', slot: 1, archived: false },
+    { id: 'old-portfolio', name: '旧ポートフォリオ', slot: 2, archived: true },
+    { id: 'free', name: 'フリー部屋', slot: 3, archived: false }
+  ]
+};
+// lp = 手動配置ずみ / housetodo = 構造だけ（座標なし→自動レイアウト）
+let LAYOUTS = {
+  lp: {
+    version: 2,
+    size: { w: 10.6, d: 8.6 },
+    departments: [
+      { id: 'research', name: '情報収集', x: -2.6, z: -1.2, w: 4.4, d: 3.1, rugColor: '#d9e6dc', manual: true },
+      { id: 'writer',   name: 'ライター', x: 2.6,  z: -1.2, w: 4.4, d: 3.1, rugColor: '#f0e4d3', manual: true },
+      { id: 'design',   name: 'デザイナー', x: -2.6, z: 2.4, w: 4.4, d: 3.1, rugColor: '#e6ddef', manual: true }
+    ],
+    islands: [
+      { id: 'isl-r1', department: 'research', x: -2.6, z: -1.2, rotationDeg: 0, manual: true,
+        managerSeats: [],
+        memberSeats: [ { issue: 32 }, { issue: null }, { issue: null }, { issue: null } ] },
+      { id: 'isl-w1', department: 'writer', x: 2.6, z: -1.2, rotationDeg: 0, manual: true,
+        managerSeats: [],
+        memberSeats: [ { issue: 36 }, { issue: 37 }, { issue: null }, { issue: null } ] },
+      { id: 'isl-d1', department: 'design', x: -2.6, z: 2.4, rotationDeg: 0, manual: true,
+        managerSeats: [],
+        memberSeats: [ { issue: 39 }, { issue: null }, { issue: null }, { issue: null } ] }
+    ],
+    props: []
+  },
+  housetodo: {
+    version: 2,
+    departments: [
+      { id: 'dev', name: '実装', rugColor: '#d9e6dc' },
+      { id: 'res', name: '調査', rugColor: '#dde4ec' }
+    ],
+    islands: [
+      { id: 'isl-dev', department: 'dev',
+        managerSeats: [],
+        memberSeats: [ { issue: 52 }, { issue: null }, { issue: null }, { issue: null } ] },
+      { id: 'isl-res', department: 'res',
+        managerSeats: [],
+        memberSeats: [ { issue: 54 }, { issue: null }, { issue: null }, { issue: null } ] }
+    ],
+    props: []
+  },
+  free: {
+    version: 2,
+    size: { w: 10.6, d: 8.6 },
+    departments: [
+      { id: 'spot', name: '単発作業場', x: 0, z: 0.4, w: 7.6, d: 5.2, rugColor: '#eef0da', manual: true }
+    ],
+    islands: [
+      { id: 'desk-f1', department: 'spot', x: -2.4, z: 0.4, rotationDeg: 0, manual: true,
+        managerSeats: [], memberSeats: [ { issue: 61 } ] },
+      { id: 'desk-f2', department: 'spot', x: 0, z: 0.4, rotationDeg: 0, manual: true,
+        managerSeats: [], memberSeats: [ { issue: null } ] },
+      { id: 'desk-f3', department: 'spot', x: 2.4, z: 0.4, rotationDeg: 0, manual: true,
+        managerSeats: [], memberSeats: [ { issue: null } ] }
+    ],
+    props: []
+  }
+};
+let ISSUES = [
+  { number: 101, title: '全体の進行管理', assignee: 'ChatGPT', seat: 'director', room: null, status: 'working', state: 'open', parent: null, out: '（管理Issueで集約）', ask: null },
+  { number: 31, title: '情報収集の統括', assignee: 'ChatGPT', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: null, out: '（管理Issue）', ask: null },
+  { number: 32, title: '競合LPの調査', assignee: 'Muse', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 31, out: 'work/research.md', ask: null },
+  { number: 33, title: '口コミ収集', assignee: 'Codex', seat: 'member', room: 'lp', status: 'waiting_review', state: 'closed', parent: 31, out: 'work/reviews.md', ask: null },
+  { number: 35, title: '文章チームの管理', assignee: 'Muse', seat: 'bucho', bucho: true, room: 'lp', status: 'waiting_review', state: 'open', parent: null, out: '（管理Issue）', ask: null,
+    reportTo: { name: 'ChatGPT（総監督）', chat: 'https://chatgpt.com/' },
+    reportText: '【報告】文章チームの管理：LP本文の執筆（work/lp-body.md）と見出し案（work/headlines.md）が揃いました。全体の進行確認をお願いします。' },
+  { number: 36, title: 'LP本文の執筆', assignee: 'ChatGPT', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 35, out: 'work/lp-body.md', ask: null,
+    chat: { label: 'ChatGPT（LP制作の会話）', url: 'https://chatgpt.com/' } },
+  { number: 37, title: '見出し案の作成', assignee: 'Codex', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 35, out: 'work/headlines.md', ask: null },
+  { number: 40, title: 'キャッチコピー案の作成', assignee: 'ChatGPT', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 35, out: 'work/catchcopy.md', ask: null },
+  { number: 38, title: 'デザイン進行', assignee: 'Codex', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: null, out: '（管理Issue）', ask: null },
+  { number: 39, title: 'バナー画像の生成', assignee: 'Muse', seat: 'member', room: 'lp', status: 'waiting_approval', state: 'open', parent: 38, out: '（承認待ち）', ask: '画像生成ツールの利用許可がほしい' },
+  { number: 41, title: 'サムネイル案の作成', assignee: 'Codex', seat: 'member', room: 'lp', status: 'not_started', state: 'open', parent: 38, out: null, ask: null },
+  { number: 51, title: '実装の割り振り', assignee: 'Codex', seat: 'member', room: 'housetodo', status: 'working', state: 'open', parent: null, out: '（管理Issue）', ask: null },
+  { number: 52, title: 'WebMCP組み込み', assignee: 'Muse', seat: 'member', room: 'housetodo', status: 'working', state: 'open', parent: 51, out: 'PR #11', ask: null },
+  { number: 53, title: '調査の管理', assignee: 'Muse', seat: 'bucho', bucho: true, room: 'housetodo', status: 'working', state: 'open', parent: null, out: '（管理Issue）', ask: null },
+  { number: 54, title: 'MCP仕様の調査', assignee: 'ChatGPT', seat: 'member', room: 'housetodo', status: 'waiting_review', state: 'open', parent: 53, out: 'work/mcp-notes.md', ask: null,
+    reportTo: { name: 'Muse（親：調査の管理）', chat: '' },
+    reportText: '【報告】MCP仕様の調査が完了しました。成果物：rooms/housetodo/work/mcp-notes.md。要点は認証方式とツール一覧です。確認をお願いします。',
+    preCheck: { by: 'Muse（部長）', recommend: '報告書（work/mcp-notes.md）を確認。要点が認証方式とツール一覧に整理されており、最終確認へ回して問題なし', concerns: 'ツール一覧の網羅性は、公式ドキュメントとの突き合わせまではしていない' },
+    chat: { label: 'Muse サイドチャット「開発：エージェント作業ボード」', url: 'https://muse.ai/' } },
+  { number: 61, title: '単発の相談（献立どうする）', assignee: 'Muse', seat: 'member', room: 'free', status: 'working', state: 'open', parent: null, out: null, ask: null,
+    chat: { label: 'Muse メインチャット' } },
+  { number: 102, title: '秘書・伝令', assignee: 'Muse', seat: 'secretary', room: null, status: 'working', state: 'open', parent: 101, out: '（伝令）', ask: null }
+];
+let SETTINGS_RAW = null; // サーバー取得した settings.json の生データ（保存時のマージ用）
+let REPO_NAME = null;    // 接続中の会社 repo（owner/name）
+const issueByNum = n => ISSUES.find(i => i.number === n) || null;
+function childProgress(issue) {
+  if (!issue) return null;
+  const kids = ISSUES.filter(i => i.parent === issue.number);
+  if (!kids.length) return null;
+  return { done: kids.filter(i => i.state === 'closed').length, total: kids.length };
+}
+
+// ===== 自動レイアウト =====
+// 島の占有サイズ：通常島（部下4＋上司）/ 単独机
+const ISL_W = 5.6, ISL_D = 2.6, DESK_W = 1.8, DESK_D = 1.8;
+const islSize = isl => (isl.memberSeats.length <= 1 && isl.managerSeats.length === 0)
+  ? { w: DESK_W, d: DESK_D } : { w: ISL_W, d: ISL_D };
+
+function autoLayout(L, forceAll = false) {
+  // 部署ごとに島を集める
+  const depts = L.departments;
+  const byDept = new Map(depts.map(d => [d.id, []]));
+  for (const isl of L.islands) if (byDept.has(isl.department)) byDept.get(isl.department).push(isl);
+  // 部署の大きさ（島の並びから計算。部署が正方形に近づく列数を選ぶ。手動指定の w/d は尊重）
+  for (const d of depts) {
+    const isls = byDept.get(d.id);
+    const n = Math.max(1, isls.length);
+    let cols;
+    if (d.w) {
+      cols = Math.min(n, Math.max(1, Math.round((d.w - 1.0) / ISL_W)));
+    } else {
+      let best = null;
+      for (let c = 1; c <= Math.min(3, n); c++) {
+        const w = c * ISL_W + 1.0;
+        const dep = Math.ceil(n / c) * ISL_D + 1.4;
+        const score = Math.abs(Math.log(w / dep));
+        if (!best || score < best.score) best = { c, score };
+      }
+      cols = best.c;
+      d.w = cols * ISL_W + 1.0;
+    }
+    const rows = Math.max(1, Math.ceil(isls.length / cols));
+    if (!d.d) d.d = rows * ISL_D + 1.4;
+    d._cols = cols; d._rows = rows;
+  }
+  // 部署の配置：手動（manual & 座標あり）は固定し、残りをグリッドへ
+  // グリッドの列数は「部屋が正方形に近づく」ものを選ぶ
+  const auto = depts.filter(d => forceAll || !d.manual || d.x === undefined);
+  const fixedRects = depts.filter(d => !auto.includes(d)).map(d => ({ x: d.x, z: d.z, w: d.w, d: d.d }));
+  const cellW = Math.max(...depts.map(d => d.w)) + 1.0;
+  const cellD = Math.max(...depts.map(d => d.d)) + 1.0;
+  function sizeFor(c) {
+    const rowsT = Math.ceil(depts.length / c);
+    let halfW = 0, halfD = 0;
+    depts.forEach((d, i) => {
+      const x = -(c * cellW) / 2 + cellW * ((i % c) + 0.5);
+      const z = -(rowsT * cellD) / 2 + cellD * (Math.floor(i / c) + 0.5);
+      halfW = Math.max(halfW, Math.abs(x) + d.w / 2 + 1.2);
+      halfD = Math.max(halfD, Math.abs(z) + d.d / 2 + 1.2);
+    });
+    return {
+      w: Math.max(10.6, Math.ceil(halfW * 4) / 2),
+      d: Math.max(8.6, Math.ceil(halfD * 4) / 2)
+    };
+  }
+  let cols = 1, bestScore = Infinity;
+  for (let c = 1; c <= Math.max(1, depts.length); c++) {
+    const s = sizeFor(c);
+    const score = Math.abs(Math.log(s.w / s.d));
+    if (score < bestScore - 0.001) { bestScore = score; cols = c; }
+  }
+  const rowsTotal = Math.ceil(depts.length / cols);
+  const gridW = cols * cellW, gridD = rowsTotal * cellD;
+  const overlaps = (x, z, w, d) => fixedRects.some(r =>
+    Math.abs(r.x - x) < (r.w + w) / 2 && Math.abs(r.z - z) < (r.d + d) / 2);
+  let slotIdx = 0;
+  for (const d of auto) {
+    let placed = false;
+    while (!placed) {
+      const c = slotIdx % cols, r = Math.floor(slotIdx / cols);
+      slotIdx++;
+      const x = -gridW / 2 + cellW * (c + 0.5);
+      const z = -gridD / 2 + cellD * (r + 0.5);
+      if (!overlaps(x, z, d.w, d.d)) { d.x = x; d.z = z; placed = true; }
+      if (slotIdx > 64) { d.x = x; d.z = z; placed = true; }
+    }
+  }
+  // 島の配置（部署内）：手動島は固定、残りは部署内の行列へ
+  for (const d of depts) {
+    const isls = byDept.get(d.id);
+    const colsI = d._cols || 1;
+    let i = 0;
+    for (const isl of isls) {
+      if (!forceAll && isl.manual && isl.x !== undefined) { i++; continue; }
+      const s = islSize(isl);
+      const c = i % colsI, r = Math.floor(i / colsI);
+      isl.x = d.x + (c - (colsI - 1) / 2) * (ISL_W + 0.2);
+      isl.z = d.z + (r - ((d._rows || 1) - 1) / 2) * (ISL_D + 0.3);
+      if (isl.rotationDeg === undefined) isl.rotationDeg = 0;
+      i++;
+    }
+  }
+  // 部屋サイズ：全部署が収まる大きさ（最小 10.6×8.6）
+  if (!L.size || forceAll) {
+    let halfW = 0, halfD = 0;
+    for (const d of depts) {
+      halfW = Math.max(halfW, Math.abs(d.x) + d.w / 2 + 1.2);
+      halfD = Math.max(halfD, Math.abs(d.z) + d.d / 2 + 1.2);
+    }
+    L.size = {
+      w: Math.max(10.6, Math.ceil(halfW * 4) / 2),
+      d: Math.max(8.6, Math.ceil(halfD * 4) / 2)
+    };
+  }
+  return L;
+}
+function effectiveLayout(roomId) {
+  const L = JSON.parse(JSON.stringify(LAYOUTS[roomId]));
+  const need = !L.size || L.departments.some(d => d.x === undefined) || L.islands.some(i => i.x === undefined);
+  if (need) autoLayout(L);
+  return L;
+}
+function ensureLayout(roomId) {
+  if (!LAYOUTS[roomId]) {
+    LAYOUTS[roomId] = { version: 2, departments: [ { id: 'main', name: 'メイン', rugColor: '#e8e2d0' } ], islands: [], props: [] };
+  }
+  LAYOUTS[roomId] = effectiveLayout(roomId);
+  return LAYOUTS[roomId];
+}
+// 実データ対応：開いている member の数だけ memberSeats を確保する。
+// layout が無い部屋は ensureLayout が部署「メイン」を合成し、ここで4席の島を必要数だけ足す（契約4）。
+function prepareLayout(roomId) {
+  const L = ensureLayout(roomId);
+  const members = ISSUES.filter(i => i.room === roomId && i.state === 'open' && i.seat === 'member');
+  if (members.length) {
+    ensureDepartment(L);
+    const seatCount = () => L.islands.reduce((s, isl) => s + (isl.memberSeats || []).length, 0);
+    let added = false, n = 0;
+    while (seatCount() < members.length) {
+      L.islands.push({
+        id: 'auto-' + roomId + '-' + (++n), department: L.departments[0].id,
+        managerSeats: [],
+        memberSeats: [ { issue: null }, { issue: null }, { issue: null }, { issue: null } ]
+      });
+      added = true;
+    }
+    if (added) { delete L.size; autoLayout(L); }
+  }
+  return L;
+}
+
+// ===== 席の解決（layoutのピン留め優先＋未登録Issueの自動着席） =====
+// 実データの Issue には dept が無いので、着席はレイアウト＋親子ツリーだけで決める（契約4）。
+// ① layout の memberSeats にピン留めされた Issue をその席へ
+// ② 残りの member は「根の部長番号 → 深さ → Issue 番号」の順に、島の空き席を先頭から埋める
+function rootBuchoNum(issue) {
+  let cur = issue, top = issue, guard = 0;
+  while (cur && guard++ < 16) {
+    if (cur.bucho) return cur.number;
+    top = cur;
+    cur = cur.parent ? issueByNum(cur.parent) : null;
+  }
+  return top ? top.number : issue.number;
+}
+function resolveRoom(layout, roomId) {
+  const open = ISSUES.filter(i => i.room === roomId && i.state === 'open');
+  const byNum = new Map(open.map(i => [i.number, i]));
+  const seats = [];
+  for (const isl of layout.islands) {
+    isl.managerSeats.forEach((s, idx) => seats.push({ isl, kind: 'manager', idx, issue: s.issue ? byNum.get(s.issue) || null : null }));
+    isl.memberSeats.forEach((s, idx) => seats.push({ isl, kind: 'member', idx, issue: s.issue ? byNum.get(s.issue) || null : null }));
+  }
+  const placed = new Set(seats.filter(s => s.issue).map(s => s.issue.number));
+  const rest = open
+    .filter(i => i.seat === 'member' && !placed.has(i.number))
+    .sort((a, b) => rootBuchoNum(a) - rootBuchoNum(b) || issueDepth(a) - issueDepth(b) || a.number - b.number);
+  for (const iss of rest) {
+    const seat = seats.find(s => !s.issue && s.kind === 'member');
+    if (seat) { seat.issue = iss; seat.auto = true; }
+  }
+  return seats;
+}
+
+// ===== Three.js 基本 =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeef0ee);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 300);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+const appEl = document.getElementById('app');
+function fitRenderer() {
+  const w = appEl.clientWidth || innerWidth;
+  const h = appEl.clientHeight || innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+fitRenderer();
+renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.getElementById('app').appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+scene.add(new THREE.HemisphereLight(0xffffff, 0xcfd4cf, 0.95));
+const sun = new THREE.DirectionalLight(0xfff4e2, 1.4);
+sun.position.set(14, 20, 9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
+scene.add(sun);
+
+const mat = (color, rough = 0.9) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
+function rbox(w, h, d, color, x, y, z, r = 0.04, parent = scene) {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+function plateSprite(name, title, gold = false) {
+  const cv = document.createElement('canvas'); cv.width = 880; cv.height = 256;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = gold ? 'rgba(255,246,220,0.97)' : 'rgba(255,255,255,0.96)';
+  ctx.beginPath(); ctx.roundRect(8, 12, 864, 232, 52); ctx.fill();
+  if (gold) { ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 10; ctx.stroke(); }
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#57482c';
+  ctx.font = '600 58px system-ui, sans-serif';
+  ctx.fillText(name, 440, 84);
+  ctx.fillStyle = '#26322f';
+  let fs = 84;
+  ctx.font = `700 ${fs}px system-ui, sans-serif`;
+  while (ctx.measureText(title).width > 800 && fs > 48) { fs -= 6; ctx.font = `700 ${fs}px system-ui, sans-serif`; }
+  ctx.fillText(title, 440, 188);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(1.95, 0.57, 1);
+  return sp;
+}
+function textSprite(text, scale = 1) {
+  const cv = document.createElement('canvas'); cv.width = 768; cv.height = 192;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.97)';
+  ctx.beginPath(); ctx.roundRect(32, 24, 704, 144, 40); ctx.fill();
+  ctx.strokeStyle = 'rgba(36,50,50,0.4)'; ctx.lineWidth = 8; ctx.stroke();
+  ctx.fillStyle = '#243232';
+  ctx.font = '700 78px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 384, 100);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(1.5 * scale, 0.38 * scale, 1);
+  return sp;
+}
+function bangSprite() {
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(64, 64, 56, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#B60205';
+  ctx.font = '700 84px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('!', 64, 68);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(0.34, 0.34, 1);
+  return sp;
+}
+
+// ===== 家具 =====
+function officeDesk(parent, x, z, rotY = 0) {
+  const g = new THREE.Group();
+  rbox(1.24, 0.07, 0.66, 0xf4f5f3, 0, 0.6, 0, 0.03, g);
+  rbox(0.08, 0.55, 0.56, 0xc9cdc7, -0.55, 0.28, 0, 0.02, g);
+  rbox(0.08, 0.55, 0.56, 0xc9cdc7, 0.55, 0.28, 0, 0.02, g);
+  g.position.set(x, 0, z); g.rotation.y = rotY;
+  parent.add(g);
+  return g;
+}
+function officeChair(parent, x, z, rotY = 0, color = 0x71808a) {
+  const g = new THREE.Group();
+  const seatM = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.09, 20), mat(color));
+  seatM.position.set(0, 0.36, 0); seatM.castShadow = true; g.add(seatM);
+  rbox(0.44, 0.55, 0.08, color, 0, 0.72, 0.22, 0.05, g);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.3, 10), mat(0x59636a));
+  pole.position.set(0, 0.17, 0); g.add(pole);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.04, 20), mat(0x59636a));
+  base.position.set(0, 0.03, 0); g.add(base);
+  g.position.set(x, 0, z); g.rotation.y = rotY;
+  parent.add(g);
+  return g;
+}
+function monitor(parent, x, y, z) {
+  rbox(0.52, 0.34, 0.04, 0x44525e, x, y + 0.24, z, 0.02, parent);
+  rbox(0.46, 0.28, 0.045, 0xa9cbdd, x, y + 0.24, z + 0.005, 0.015, parent);
+  rbox(0.08, 0.1, 0.08, 0x44525e, x, y + 0.05, z, 0.015, parent);
+}
+
+// ===== 人（Issueから描く） =====
+let animated = [];
+let clickables = [];
+function tierOf(issue) {
+  const d = issueDepth(issue);
+  if (d < 0) return SETTINGS.tiers.director;
+  return SETTINGS.tiers[String(d)] || SETTINGS.tiers.default;
+}
+function issueDepth(issue) {
+  if (!issue) return 3;
+  if (issue.seat === 'director') return -1;
+  if (issue.bucho) return 0;
+  let d = 1, cur = issue, guard = 0;
+  while (cur && cur.parent && guard++ < 8) {
+    const p = issueByNum(cur.parent);
+    if (!p) break;
+    if (p.bucho || p.seat === 'director') return d;
+    d++; cur = p;
+  }
+  return d;
+}
+function infoOf(issue) {
+  return {
+    name: issue.assignee, role: issue.seat, title: issue.title,
+    status: issue.status, out: issue.out, ask: issue.ask, number: issue.number
+  };
+}
+function person(parent, x, z, rotY, issue) {
+  const info = infoOf(issue);
+  const g = new THREE.Group();
+  const bodyColor = tierOf(issue).color;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.22, 6, 14), mat(bodyColor));
+  body.position.set(0, 0.55, 0); body.castShadow = true;
+  g.add(body);
+  const mkArm = side => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.21 * side, 0.85, -0.02);
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.2, 4, 10), mat(bodyColor));
+    arm.position.set(0, -0.15, 0); arm.castShadow = true;
+    pivot.add(arm); g.add(pivot);
+    return pivot;
+  };
+  const armL = mkArm(-1), armR = mkArm(1);
+  const headG = new THREE.Group();
+  headG.position.set(0, 0.92, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.175, 24, 18), mat(0xf4cda3));
+  head.castShadow = true;
+  headG.add(head);
+  const stDef = info.status ? SETTINGS.statuses[info.status] : null;
+  if (stDef) {
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.185, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(stDef.color, 0.7));
+    cap.position.y = 0.03; cap.castShadow = true;
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.03, 24), mat(stDef.color, 0.7));
+    brim.position.set(0, 0.03, -0.1); brim.scale.z = 0.75; brim.castShadow = true;
+    headG.add(cap, brim);
+  }
+  g.add(headG);
+  const plate = plateSprite(info.name, info.title, info.role === 'director');
+  plate.position.set(0, 1.52, 0);
+  g.add(plate);
+  let bang = null;
+  if (info.status === 'waiting_approval') {
+    bang = bangSprite();
+    bang.position.set(0.42, 1.3, 0);
+    g.add(bang);
+    armR.rotation.x = 2.7;
+    armL.rotation.x = 0.85;
+  } else if (info.status === 'working') {
+    armL.rotation.x = 1.35; armR.rotation.x = 1.35;
+  } else if (info.status === 'not_started') {
+    armL.rotation.x = 0.12; armR.rotation.x = 0.12;
+  } else {
+    armL.rotation.x = 0.5; armR.rotation.x = 0.5;
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY;
+  g.userData.info = info;
+  g.userData.anchorLocal = { x, z };
+  g.userData.anchorGroup = parent;
+  parent.add(g);
+  clickables.push(g);
+  animated.push({ armL, armR, headG, bang, root: g, kind: info.status, phase: Math.random() * Math.PI * 2 });
+  return g;
+}
+function seatSolo(parent, x, z, rotY, issue) {
+  const fx = -Math.sin(rotY), fz = -Math.cos(rotY);
+  const dx = x + fx * 0.74, dz = z + fz * 0.74;
+  const desk = officeDesk(parent, dx, dz, rotY);
+  officeChair(parent, x, z, rotY);
+  if (issue) {
+    const mg = new THREE.Group();
+    mg.position.set(dx, 0.6, dz); mg.rotation.y = rotY;
+    parent.add(mg);
+    monitor(mg, 0, 0.04, -0.08);
+    person(parent, x, z, rotY, issue);
+    desk.userData.info = infoOf(issue);
+    desk.userData.anchorLocal = { x, z };
+    desk.userData.anchorGroup = parent;
+    clickables.push(desk);
+  }
+}
+function sharedDesk(parent) {
+  rbox(4.9, 0.07, 0.95, 0xf4f5f3, 0, 0.6, 0, 0.03, parent);
+  rbox(4.7, 0.55, 0.08, 0xc9cdc7, 0, 0.28, -0.4, 0.02, parent);
+  rbox(4.7, 0.55, 0.08, 0xc9cdc7, 0, 0.28, 0.4, 0.02, parent);
+}
+function seatAtTable(parent, pos, issue) {
+  officeChair(parent, pos.x, pos.z, pos.rotY);
+  if (!issue) return;
+  const fx = -Math.sin(pos.rotY), fz = -Math.cos(pos.rotY);
+  const mg = new THREE.Group();
+  mg.position.set(pos.x + fx * 0.58, 0.6, pos.z + fz * 0.58);
+  mg.rotation.y = pos.rotY;
+  parent.add(mg);
+  monitor(mg, 0, 0.04, -0.08);
+  person(parent, pos.x, pos.z, pos.rotY, issue);
+}
+const MEMBER_POS = [
+  { x: -1.98, z: -0.78, rotY: Math.PI }, { x: -0.66, z: -0.78, rotY: Math.PI },
+  { x: 0.66, z: -0.78, rotY: Math.PI }, { x: 1.98, z: -0.78, rotY: Math.PI },
+  { x: -1.98, z: 0.78, rotY: 0 }, { x: -0.66, z: 0.78, rotY: 0 },
+  { x: 0.66, z: 0.78, rotY: 0 }, { x: 1.98, z: 0.78, rotY: 0 }
+];
+
+let editables = [];    // 島グループ
+let deptEditables = []; // 部署ラググループ
+function buildIsland(parent, islLayout, seatsOfIsland) {
+  const g = new THREE.Group();
+  g.position.set(islLayout.x || 0, 0, islLayout.z || 0);
+  g.rotation.y = THREE.MathUtils.degToRad(islLayout.rotationDeg || 0);
+  g.userData.isIsland = true;
+  g.userData.layoutRef = islLayout;
+  parent.add(g);
+  editables.push(g);
+  const totalSeats = islLayout.memberSeats.length + (islLayout.managerSeats || []).length;
+  if (totalSeats <= 1) {
+    const st = seatsOfIsland.find(x => x.kind === 'member' && x.idx === 0);
+    seatSolo(g, 0, 0, 0, st ? st.issue : null);
+  } else {
+    sharedDesk(g);
+    islLayout.memberSeats.forEach((s, i) => {
+      const st = seatsOfIsland.find(x => x.kind === 'member' && x.idx === i);
+      seatAtTable(g, MEMBER_POS[i], st ? st.issue : null);
+    });
+  }
+  return g;
+}
+function buildDeptRug(parent, dept) {
+  const g = new THREE.Group();
+  g.position.set(dept.x || 0, 0, dept.z || 0);
+  g.userData.isDept = true;
+  g.userData.layoutRef = dept;
+  const rug = new THREE.Mesh(new RoundedBoxGeometry(1, 0.05, 1, 2, 0.02),
+    mat(new THREE.Color(dept.rugColor || '#d9e6dc').getHex()));
+  rug.scale.set(dept.w || 4.4, 1, dept.d || 3.1);
+  rug.position.y = 0.045;
+  rug.receiveShadow = true;
+  rug.userData.isRugMesh = true;
+  g.add(rug);
+  const sign = textSprite(dept.name);
+  sign.position.set(-(dept.w || 4.4) / 2 + 0.9, 1.05, -(dept.d || 3.1) / 2 + 0.2);
+  sign.userData.isSign = true;
+  g.add(sign);
+  const handle = rbox(0.34, 0.16, 0.34, 0xd9a441, (dept.w || 4.4) / 2, 0.1, (dept.d || 3.1) / 2, 0.05, g);
+  handle.userData.isHandle = true;
+  handle.visible = false;
+  g.userData.rugMesh = rug;
+  g.userData.sign = sign;
+  g.userData.handle = handle;
+  parent.add(g);
+  deptEditables.push(g);
+  return g;
+}
+function refreshDeptRug(g) {
+  const dept = g.userData.layoutRef;
+  g.userData.rugMesh.scale.set(dept.w, 1, dept.d);
+  g.userData.sign.position.set(-dept.w / 2 + 0.9, 1.05, -dept.d / 2 + 0.2);
+  g.userData.handle.position.set(dept.w / 2, 0.1, dept.d / 2);
+}
+function buildRoomContents(parent, effLayout, roomId, furniture = true) {
+  const seats = resolveRoom(effLayout, roomId);
+  for (const dept of effLayout.departments) buildDeptRug(parent, dept);
+  for (const isl of effLayout.islands) {
+    buildIsland(parent, isl, seats.filter(s => s.isl === isl));
+  }
+  const bucho = ISSUES.find(i => i.room === roomId && i.bucho && i.state === 'open');
+  if (bucho) {
+    const W = effLayout.size.w, D = effLayout.size.d;
+    const rectDist = (a, b) => {
+      const dx = Math.max(b.x0 - a.x1, a.x0 - b.x1, 0);
+      const dz = Math.max(b.z0 - a.z1, a.z0 - b.z1, 0);
+      return Math.hypot(dx, dz);
+    };
+    const islRects = effLayout.islands.map(isl => ({
+      x0: (isl.x || 0) - 2.75, x1: (isl.x || 0) + 2.75,
+      z0: (isl.z || 0) - 1.15, z1: (isl.z || 0) + 1.15
+    }));
+    islRects.push({ x0: W / 2 - 2.35, x1: W / 2 - 0.85, z0: D / 2 - 2.15, z1: D / 2 - 0.65 });
+    const candRect = c => c.rotY === Math.PI
+      ? { x0: c.x - 0.65, x1: c.x + 0.65, z0: c.z - 0.35, z1: c.z + 1.1 }
+      : { x0: c.x - 0.65, x1: c.x + 0.65, z0: c.z - 1.1, z1: c.z + 0.35 };
+    const cands = [
+      { x: -W / 2 + 1.5, z: -D / 2 + 1.25, rotY: Math.PI },
+      { x: W / 2 - 1.5, z: -D / 2 + 1.25, rotY: Math.PI },
+      { x: -W / 2 + 3.4, z: -D / 2 + 1.25, rotY: Math.PI },
+      { x: W / 2 - 3.4, z: -D / 2 + 1.25, rotY: Math.PI },
+      { x: -W / 2 + 1.5, z: D / 2 - 1.25, rotY: 0 },
+      { x: W / 2 - 1.5, z: D / 2 - 1.25, rotY: 0 },
+      { x: -W / 2 + 3.4, z: D / 2 - 1.25, rotY: 0 },
+      { x: W / 2 - 3.4, z: D / 2 - 1.25, rotY: 0 }
+    ];
+    let best = cands[0], bestScore = -1;
+    for (const c of cands) {
+      const r = candRect(c);
+      let score = 1e9;
+      for (const ir of islRects) score = Math.min(score, rectDist(r, ir));
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    seatSolo(parent, best.x, best.z, best.rotY, bucho);
+  }
+  if (!furniture) return;
+  const W = effLayout.size.w, D = effLayout.size.d;
+  const tx = W / 2 - 1.6, tz = D / 2 - 1.4;
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.07, 28), mat(0xffffff));
+  top.position.set(tx, 0.62, tz); top.castShadow = true; top.receiveShadow = true; parent.add(top);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.6, 14), mat(0x8a9797));
+  leg.position.set(tx, 0.31, tz); leg.castShadow = true; parent.add(leg);
+  rbox(2.6, 1.2, 0.05, 0xcfd8d4, -W / 2 + 3.4, 1.5, -D / 2 + 0.28, 0.02, parent);
+  rbox(2.46, 1.06, 0.06, 0xffffff, -W / 2 + 3.4, 1.5, -D / 2 + 0.29, 0.02, parent);
+  rbox(0.9, 0.05, 0.07, 0x9fc6bb, -W / 2 + 3.15, 1.66, -D / 2 + 0.31, 0.01, parent);
+  rbox(0.7, 0.05, 0.07, 0xd9a7a0, -W / 2 + 3.3, 1.48, -D / 2 + 0.31, 0.01, parent);
+}
+function buildDirector(parent, furniture = true) {
+  const issue = BUILDING.director.issue ? issueByNum(BUILDING.director.issue) : null;
+  rbox(2.4, 0.09, 1.0, 0xb08a5e, 0, 0.72, -2.6, 0.035, parent);
+  rbox(2.2, 0.6, 0.85, 0x9a744c, 0, 0.3, -2.6, 0.03, parent);
+  officeChair(parent, 0, -3.3, Math.PI, 0x5d6d66);
+  const mg = new THREE.Group();
+  mg.position.set(0, 0.72, -2.55); mg.rotation.y = Math.PI;
+  parent.add(mg);
+  monitor(mg, 0, 0.04, -0.08);
+  if (issue && issue.state === 'open') person(parent, 0, -3.3, Math.PI, issue);
+  const sec = ISSUES.find(i => i.seat === 'secretary' && i.state === 'open');
+  if (sec) seatSolo(parent, 2.05, -1.1, Math.PI / 2, sec);
+  if (!furniture) return;
+  rbox(3.6, 0.08, 1.3, 0xf4f5f3, 0, 0.66, 0.6, 0.03, parent);
+  rbox(3.3, 0.55, 1.0, 0xc9cdc7, 0, 0.3, 0.6, 0.03, parent);
+  [-1.2, 0, 1.2].forEach(dx => {
+    officeChair(parent, dx, 1.55, Math.PI, 0x8a9797);
+    officeChair(parent, dx, -0.35, 0, 0x8a9797);
+  });
+  const sign = textSprite('社長室', 1.3);
+  sign.position.set(0, 2.2, -3.9);
+  parent.add(sign);
+  rbox(3.36, 1.46, 0.05, 0xffffff, 0, 1.55, -4.01, 0.02, parent);
+  rbox(3.2, 1.3, 0.06, 0xcfe4ee, 0, 1.55, -3.99, 0.02, parent);
+}
+
+// 全室の正規化（座標が無い部屋は自動レイアウト）は boot() で行う（実データ取得の後）
+
+// ===== 外枠 =====
+let roomShell = null;
+function buildRoomShell(W, D) {
+  if (roomShell) { scene.remove(roomShell); roomShell = null; }
+  roomShell = new THREE.Group();
+  rbox(W + 0.6, 0.3, D + 0.6, 0xdfe3df, 0, -0.15, 0, 0.06, roomShell);
+  const nx = Math.floor(W), ny = Math.floor(D);
+  for (let x = 0; x < nx; x++) for (let y = 0; y < ny; y++) {
+    const c = (x + y) % 2 === 0 ? 0xe9ede9 : 0xe2e7e2;
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.04, 0.98), mat(c));
+    t.position.set(x - (nx - 1) / 2, 0.02, y - (ny - 1) / 2);
+    t.receiveShadow = true;
+    roomShell.add(t);
+  }
+  rbox(W + 0.6, 2.4, 0.25, 0xfbfcfb, 0, 1.2, -D / 2 - 0.28, 0.05, roomShell);
+  rbox(0.25, 2.4, D + 0.6, 0xfbfcfb, -W / 2 - 0.28, 1.2, 0, 0.05, roomShell);
+  rbox(1.5, 1.15, 0.06, 0xffffff, -W / 2 + 0.6, 1.55, -D / 2 - 0.12, 0.03, roomShell);
+  rbox(1.34, 0.99, 0.07, 0xcfe4ee, -W / 2 + 0.6, 1.55, -D / 2 - 0.11, 0.02, roomShell);
+  scene.add(roomShell);
+}
+const buildingShell = new THREE.Group();
+let groundMesh = null;
+{
+  groundMesh = rbox(38, 0.25, 16.5, 0xe6dbc7, 0, -0.32, 0.9, 0.08, buildingShell);
+}
+buildingShell.visible = false;
+scene.add(buildingShell);
+
+function roomBoxInto(parent, w, d, floorColor, accent, name) {
+  const wallH = 1.7, t = 0.18;
+  const frontZ = d / 2, backZ = -d / 2;
+  rbox(w, 0.3, d, floorColor, 0, -0.15, 0, 0.04, parent);
+  rbox(w, wallH, t, 0xfbfcfb, 0, wallH / 2, backZ, 0.03, parent);
+  rbox(t, wallH, d, 0xfbfcfb, -w / 2, wallH / 2, 0, 0.03, parent);
+  rbox(t, wallH, d, 0xfbfcfb, w / 2, wallH / 2, 0, 0.03, parent);
+  rbox(w, wallH, t, 0xfbfcfb, 0, wallH / 2, frontZ, 0.03, parent);
+  rbox(w, 0.14, t + 0.04, accent, 0, wallH + 0.02, backZ, 0.02, parent);
+  rbox(w, 0.12, t + 0.04, accent, 0, 1.12, frontZ, 0.02, parent);
+  const sign = textSprite(name, 1.9);
+  sign.position.set(0, 1.62, frontZ + 0.25);
+  parent.add(sign);
+}
+const ROOM_FLOORS = [0xf3ead8, 0xe6edf2, 0xf2e6ee, 0xe8f0e4];
+const ROOM_ACCENTS = [0x9cc184, 0x7ea6c9, 0xd98cb3, 0x8fb8ad];
+const visibleRooms = () => BUILDING.rooms.filter(r => !r.archived).sort((a, b) => a.slot - b.slot);
+const roomBoxW = room => (LAYOUTS[room.id] ? LAYOUTS[room.id].size.w : 10.6) + 1.2;
+const roomBoxD = room => (LAYOUTS[room.id] ? LAYOUTS[room.id].size.d : 8.6) + 1.2;
+
+// ===== ビュー切り替え =====
+let viewGroup = null;
+let currentViewKey = 'all';
+let buildingRoomGroups = [];
+let directorGroup = null;
+let gridCell = { w: 12, d: 11 };
+function clearView() {
+  if (viewGroup) { scene.remove(viewGroup); viewGroup = null; }
+  if (roomShell) { scene.remove(roomShell); roomShell = null; }
+  animated = [];
+  clickables = [];
+  editables = [];
+  deptEditables = [];
+  buildingRoomGroups = [];
+  directorGroup = null;
+  if (typeof closeDetail === 'function') closeDetail();
+  else document.getElementById('detail').classList.remove('open');
+  ring.visible = false;
+  ring.scale.setScalar(1);
+}
+function setCam(px, py, pz, tx, ty, tz) {
+  camera.position.set(px, py, pz);
+  controls.target.set(tx, ty, tz);
+  controls.update();
+}
+function packBuilding() {
+  const rooms = visibleRooms();
+  const cells = [];
+  if (directorGroup) cells.push({ key: 'director', w: 6.6, d: 8.2, group: directorGroup });
+  for (const room of rooms) {
+    const g = buildingRoomGroups.find(x => x.userData.roomId === room.id);
+    if (g) cells.push({ key: room.id, w: roomBoxW(room), d: roomBoxD(room), group: g });
+  }
+  const n = Math.max(cells.length, 1);
+  const GAP = 0.06;
+  // 深さの大きい部屋から段に組む（浅い部屋が段の中で浮くのを防ぐ）
+  const sorted = [...cells].sort((a, b) => b.d - a.d);
+  let best = null;
+  for (let r = 1; r <= n; r++) {
+    const rowsArr = [];
+    let idx = 0;
+    for (let i = 0; i < r; i++) {
+      const remain = n - idx, slots = r - i;
+      const cnt = Math.ceil(remain / slots);
+      rowsArr.push(sorted.slice(idx, idx + cnt));
+      idx += cnt;
+    }
+    const rowW = rowsArr.map(row => row.reduce((s, c) => s + c.w, 0) + GAP * (row.length - 1));
+    const rowD = rowsArr.map(row => Math.max(...row.map(c => c.d)));
+    const W = Math.max(...rowW);
+    const D = rowD.reduce((a, b) => a + b, 0) + GAP * (r - 1);
+    const score = Math.abs(Math.log(W / D));
+    if (!best || score < best.score) best = { rowsArr, rowW, rowD, W, D, score };
+  }
+  // 棚配置（左・上そろえ、原点起点）
+  let z0 = 0;
+  best.rowsArr.forEach((row, ri) => {
+    let x0 = 0;
+    for (const c of row) { c._x = x0; c._z = z0; x0 += c.w + GAP; }
+    z0 += best.rowD[ri] + GAP;
+  });
+  // 圧縮：各部屋を上→左→上の順に、隣の部屋か外周にくっつくまで詰める
+  const rects = cells.map(c => ({ c, x0: c._x, z0: c._z, x1: c._x + c.w, z1: c._z + c.d }));
+  function compact(axis) {
+    const order = [...rects].sort((a, b) => axis === 'z' ? a.z0 - b.z0 : a.x0 - b.x0);
+    const settled = [];
+    for (const r of order) {
+      let limit = 0;
+      for (const s of settled) {
+        if (axis === 'z') {
+          const overlap = Math.min(r.x1, s.x1) - Math.max(r.x0, s.x0);
+          if (overlap > 0.01 && s.z1 <= r.z0 + 0.001) limit = Math.max(limit, s.z1 + GAP);
+        } else {
+          const overlap = Math.min(r.z1, s.z1) - Math.max(r.z0, s.z0);
+          if (overlap > 0.01 && s.x1 <= r.x0 + 0.001) limit = Math.max(limit, s.x1 + GAP);
+        }
+      }
+      if (axis === 'z') { const dz = limit - r.z0; r.z0 += dz; r.z1 += dz; }
+      else { const dx = limit - r.x0; r.x0 += dx; r.x1 += dx; }
+      settled.push(r);
+    }
+  }
+  compact('z'); compact('x'); compact('z');
+  const minX = Math.min(...rects.map(r => r.x0)), maxX = Math.max(...rects.map(r => r.x1));
+  const minZ = Math.min(...rects.map(r => r.z0)), maxZ = Math.max(...rects.map(r => r.z1));
+  const ox = (minX + maxX) / 2, oz = (minZ + maxZ) / 2;
+  for (const r of rects) {
+    r.c.group.position.x = (r.x0 + r.x1) / 2 - ox;
+    r.c.group.position.z = (r.z0 + r.z1) / 2 - oz;
+  }
+  const totalW = (maxX - minX) + 2.5;
+  const totalD = (maxZ - minZ) + 2.5;
+  groundMesh.scale.x = totalW / 38;
+  groundMesh.scale.z = totalD / 16.5;
+  groundMesh.position.z = 0;
+  gridCell = { w: best.W / Math.max(...best.rowsArr.map(r => r.length)), d: best.D / best.rowsArr.length };
+  return Math.max(totalW, totalD) / 2;
+}
+const legendEl = document.getElementById('legend');
+function renderLegend() {
+  const scopeName = currentViewKey === 'all' ? '全体'
+    : currentViewKey === 'director' ? '社長室'
+    : (BUILDING.rooms.find(r => r.id === currentViewKey) || {}).name || currentViewKey;
+  const scoped = currentViewKey === 'all' ? ISSUES
+    : currentViewKey === 'director' ? ISSUES.filter(i => i.room === null)
+    : ISSUES.filter(i => i.room === currentViewKey);
+  const counts = {};
+  for (const i of scoped) {
+    if (i.state !== 'open') continue;
+    if (!i.status) continue; // status が無い Issue（社長など）は人数に数えない
+    counts[i.status] = (counts[i.status] || 0) + 1;
+  }
+  legendEl.innerHTML = `<div class="lgScope">${scopeName}の人数</div>` +
+    Object.entries(SETTINGS.statuses).map(([key, st]) => {
+      const hex = '#' + st.color.toString(16).padStart(6, '0');
+      return `<div class="lgRow"><span class="dot" style="background:${hex}"></span>${st.display}<span class="lgNum">${counts[key] || 0}人</span></div>`;
+    }).join('');
+}
+function switchView(key) {
+  if (editMode) setEditMode(false);
+  currentViewKey = key;
+  renderLegend();
+  clearView();
+  viewGroup = new THREE.Group();
+  scene.add(viewGroup);
+  if (key === 'all') {
+    buildingShell.visible = true;
+    for (const room of visibleRooms()) {
+      prepareLayout(room.id);
+      const g = new THREE.Group();
+      g.userData.roomId = room.id;
+      viewGroup.add(g);
+      buildingRoomGroups.push(g);
+      const idx = BUILDING.rooms.findIndex(r => r.id === room.id);
+      roomBoxInto(g, roomBoxW(room), roomBoxD(room),
+        ROOM_FLOORS[idx % ROOM_FLOORS.length], ROOM_ACCENTS[idx % ROOM_ACCENTS.length], room.name);
+      buildRoomContents(g, LAYOUTS[room.id], room.id, false);
+    }
+    const gDir = new THREE.Group();
+    gDir.userData.roomId = 'director';
+    directorGroup = gDir;
+    viewGroup.add(gDir);
+    roomBoxInto(gDir, 6.6, 8.2, 0xf1e6cf, 0xd9a441, '社長室');
+    buildDirector(gDir, false);
+    const extent = packBuilding();
+    const dist = THREE.MathUtils.clamp(extent * 1.5 + 12, 26, 52);
+    setCam(dist * 0.52, dist * 0.66, dist * 0.66, 0, 0, 0);
+  } else if (key === 'director') {
+    buildingShell.visible = false;
+    buildRoomShell(6.6, 8.2);
+    buildDirector(viewGroup, true);
+    setCam(9.5, 9.5, 12, 0, 0.2, 0);
+  } else {
+    buildingShell.visible = false;
+    const L = prepareLayout(key);
+    buildRoomShell(L.size.w, L.size.d);
+    buildRoomContents(viewGroup, L, key, true);
+    const dist = Math.max(L.size.w, L.size.d) * 1.55;
+    setCam(dist * 0.62, dist * 0.62, dist * 0.78, 0, 0.2, 0);
+  }
+  [...tabsEl.children].forEach(b => b.classList.toggle('on', b.dataset.key === key));
+  renderEditbar();
+}
+const tabsEl = document.getElementById('tabs');
+const hintEl = document.getElementById('hint');
+const HINT_DEFAULT = 'ドラッグで回転 / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ';
+function buildTabs() {
+  tabsEl.innerHTML = '';
+  const defs = [['all', '全体'], ['director', '社長室'], ...visibleRooms().map(r => [r.id, r.name])];
+  for (const [key, label] of defs) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.dataset.key = key;
+    b.addEventListener('click', () => switchView(key));
+    tabsEl.appendChild(b);
+  }
+  [...tabsEl.children].forEach(b => b.classList.toggle('on', b.dataset.key === currentViewKey));
+}
+
+// ===== タップで詳細 =====
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(0.62, 0.76, 40),
+  new THREE.MeshBasicMaterial({ color: 0xd9a441, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.13;
+ring.visible = false;
+scene.add(ring);
+
+const detail = document.getElementById('detail');
+const settingsEl = document.getElementById('settings');
+function syncAppRight() {
+  appEl.style.right = detail.classList.contains('open') ? '352px'
+    : settingsEl.classList.contains('open') ? '320px' : '0px';
+  fitRenderer();
+}
+function openDetail() { settingsEl.classList.remove('open'); detail.classList.add('open'); syncAppRight(); }
+function closeDetail() { detail.classList.remove('open'); syncAppRight(); }
+function showDetail(info, anchorWorld) {
+  document.getElementById('dTitle').textContent = info.title;
+  const seatDef = info.role ? SETTINGS.seats[info.role] : null;
+  document.getElementById('dName').textContent =
+    `${info.name}（${seatDef ? seatDef.display : '席なし'}）`;
+  const st = info.status ? SETTINGS.statuses[info.status] : null;
+  const dStatusEl = document.getElementById('dStatus');
+  if (st) {
+    const hex = '#' + st.color.toString(16).padStart(6, '0');
+    dStatusEl.innerHTML =
+      `<span class="dot" style="background:${hex}"></span>${st.display}`;
+  } else {
+    dStatusEl.textContent = '（状態なし）';
+  }
+  document.getElementById('dIssueNum').textContent = '#' + info.number;
+  const issue = issueByNum(info.number);
+  const dIssueEl = document.getElementById('dIssue');
+  if (issue && issue.url) {
+    dIssueEl.href = issue.url;
+    dIssueEl.target = '_blank';
+    dIssueEl.rel = 'noopener';
+  } else {
+    dIssueEl.href = '#';
+    dIssueEl.removeAttribute('target');
+    dIssueEl.removeAttribute('rel');
+  }
+  const prow = document.getElementById('dParentRow');
+  if (issue && issue.parent) {
+    const p = issueByNum(issue.parent);
+    prow.style.display = '';
+    document.getElementById('dParent').textContent =
+      p ? `#${p.number} ${p.title}（${p.assignee || '担当未記入'}）` : '#' + issue.parent;
+  } else {
+    prow.style.display = 'none';
+  }
+  const asec = document.getElementById('dAskSec');
+  if (info.ask) {
+    asec.style.display = '';
+    document.getElementById('dAsk').textContent = info.ask;
+  } else {
+    asec.style.display = 'none';
+  }
+  const rsec = document.getElementById('dReportSec');
+  if (issue && issue.reportText) {
+    rsec.style.display = '';
+    document.getElementById('dReport').textContent = issue.reportText;
+    const rtEl = document.getElementById('dReportTo');
+    rtEl.textContent = '';
+    if (issue.reportTo) {
+      rtEl.appendChild(document.createTextNode('報告先：'));
+      if (issue.reportTo.chat) {
+        const a = document.createElement('a');
+        a.href = issue.reportTo.chat; a.target = '_blank'; a.rel = 'noopener';
+        a.className = 'lnk'; a.textContent = issue.reportTo.name;
+        rtEl.appendChild(a);
+      } else {
+        rtEl.appendChild(document.createTextNode(issue.reportTo.name));
+      }
+    }
+  } else {
+    rsec.style.display = 'none';
+  }
+  const csec = document.getElementById('dCheckSec');
+  if (issue && issue.preCheck) {
+    csec.style.display = '';
+    document.getElementById('dCheckT').textContent =
+      '一次確認（' + (issue.preCheck.by || '上司') + '）';
+    document.getElementById('dCheckRec').textContent = '推奨：' + issue.preCheck.recommend;
+    document.getElementById('dCheckCon').textContent =
+      issue.preCheck.concerns ? '懸念：' + issue.preCheck.concerns : '';
+  } else {
+    csec.style.display = 'none';
+  }
+  const prog = childProgress(issueByNum(info.number));
+  const row = document.getElementById('dProgRow');
+  if (prog) {
+    row.style.display = '';
+    document.getElementById('dProg').textContent = `${prog.done}/${prog.total} 完了`;
+  } else {
+    row.style.display = 'none';
+  }
+  const outEl = document.getElementById('dOut');
+  outEl.textContent = '';
+  if (info.out && /^https?:\/\//.test(info.out)) {
+    const a = document.createElement('a');
+    a.href = info.out; a.target = '_blank'; a.rel = 'noopener';
+    a.className = 'lnk'; a.textContent = info.out;
+    outEl.appendChild(a);
+  } else {
+    outEl.textContent = info.out || '（未記入）';
+  }
+updateChatUI(info);
+  openDetail();
+  ring.position.set(anchorWorld.x, 0.13, anchorWorld.z);
+  ring.scale.setScalar(1);
+  ring.material.color.set(st ? st.color : 0xd9a441);
+  ring.visible = true;
+}
+document.getElementById('detailClose').addEventListener('click', () => {
+  closeDetail();
+  ring.visible = false;
+});
+
+// ===== 設定画面 =====
+const settingsBody = document.getElementById('settingsBody');
+const hexOf = n => '#' + n.toString(16).padStart(6, '0');
+let applyTimer = null;
+function applySettings(rebuild) {
+  renderLegend();
+  if (!rebuild) return;
+  clearTimeout(applyTimer);
+  applyTimer = setTimeout(() => switchView(currentViewKey), 300);
+}
+function openSettings() {
+  closeDetail();
+  ring.visible = false;
+  renderSettings();
+  settingsEl.classList.add('open');
+  syncAppRight();
+}
+function closeSettings() { settingsEl.classList.remove('open'); syncAppRight(); }
+document.getElementById('settingsToggle').addEventListener('click', () => {
+  settingsEl.classList.contains('open') ? closeSettings() : openSettings();
+});
+document.getElementById('settingsClose').addEventListener('click', closeSettings);
+
+function renderSettings() {
+  settingsBody.innerHTML = '';
+  const mkH = t => {
+    const h = document.createElement('h3');
+    h.textContent = t;
+    settingsBody.appendChild(h);
+  };
+  const row = (keyLabel, colorVal, onColor, nameVal, onName, onDelete) => {
+    const r = document.createElement('div');
+    r.className = 'srow';
+    const k = document.createElement('span');
+    k.className = 'skey';
+    k.textContent = keyLabel;
+    r.appendChild(k);
+    if (onColor) {
+      const c = document.createElement('input');
+      c.type = 'color';
+      c.value = hexOf(colorVal);
+      c.addEventListener('input', () => { onColor(parseInt(c.value.slice(1), 16)); applySettings(false); });
+      c.addEventListener('change', () => applySettings(true));
+      r.appendChild(c);
+    }
+    if (onName) {
+      const t = document.createElement('input');
+      t.type = 'text';
+      t.value = nameVal;
+      t.addEventListener('input', () => { onName(t.value); applySettings(false); });
+      t.addEventListener('change', () => applySettings(true));
+      r.appendChild(t);
+    }
+    if (onDelete) {
+      const del = document.createElement('button');
+      del.className = 'sdel';
+      del.textContent = '削除';
+      del.addEventListener('click', onDelete);
+      r.appendChild(del);
+    }
+    settingsBody.appendChild(r);
+  };
+  mkH('状態（帽子の色と表示名）');
+  for (const st of Object.values(SETTINGS.statuses)) {
+    row(st.label.replace('status:', ''), st.color,
+      v => { st.color = v; },
+      st.display, v => { st.display = v; });
+  }
+  mkH('服の色（階層 tiers）');
+  const tierRows = [
+    ['社長', SETTINGS.tiers.director, null],
+    ['部長', SETTINGS.tiers['0'], null],
+    ['部下', SETTINGS.tiers.default, null]
+  ];
+  const depthKeys = Object.keys(SETTINGS.tiers)
+    .filter(k => /^[0-9]+$/.test(k) && k !== '0')
+    .sort((a, b) => Number(a) - Number(b));
+  for (const k of depthKeys) {
+    tierRows.push([`深さ${k}`, SETTINGS.tiers[k], () => {
+      delete SETTINGS.tiers[k];
+      renderSettings();
+      applySettings(true);
+    }]);
+  }
+  for (const [label, tier, onDelete] of tierRows) {
+    row(label, tier.color, v => { tier.color = v; }, tier.name, v => { tier.name = v; }, onDelete);
+  }
+  const nextDepth = [1, 2, 3, 4, 5, 6, 7].find(d => !SETTINGS.tiers[String(d)]);
+  const addBtn = document.createElement('button');
+  addBtn.className = 'addTier';
+  if (nextDepth) {
+    addBtn.textContent = `＋ 階層を追加（深さ${nextDepth}）`;
+    addBtn.addEventListener('click', () => {
+      SETTINGS.tiers[String(nextDepth)] = { name: '部下', color: 0xA9BFD2 };
+      renderSettings();
+      applySettings(true);
+    });
+  } else {
+    addBtn.textContent = '深さ7まで追加済みです';
+    addBtn.disabled = true;
+  }
+  settingsBody.appendChild(addBtn);
+  mkH('席の表示名');
+  for (const seat of Object.values(SETTINGS.seats)) {
+    row(seat.label.replace('seat:', ''), null, null, seat.display, v => { seat.display = v; });
+  }
+}
+
+const TIERS_NOTE = 'キーは sub-issue ツリーの深さ（部長=0）。深い階層に名前と色を付けたい場合は \"1\" \"2\" のようにキーを足す。定義のない深さは default を使う。既定では部下は深さによらず一律グレー。';
+function settingsToJson() {
+  const hex = n => n.toString(16).padStart(6, '0').toUpperCase();
+  const statuses = {}, seats = {}, tiers = {};
+  for (const [k, v] of Object.entries(SETTINGS.statuses)) {
+    statuses[k] = { color: hex(v.color), display: v.display, label: v.label };
+  }
+  for (const [k, v] of Object.entries(SETTINGS.seats)) {
+    seats[k] = { display: v.display, label: v.label };
+  }
+  const numTierKeys = Object.keys(SETTINGS.tiers)
+    .filter(k => /^[0-9]+$/.test(k))
+    .sort((a, b) => Number(a) - Number(b));
+  for (const k of numTierKeys) {
+    tiers[k] = { color: hex(SETTINGS.tiers[k].color), name: SETTINGS.tiers[k].name };
+  }
+  tiers['_note'] = TIERS_NOTE;
+  tiers['default'] = { color: hex(SETTINGS.tiers.default.color), name: SETTINGS.tiers.default.name };
+  tiers['director'] = { color: hex(SETTINGS.tiers.director.color), name: SETTINGS.tiers.director.name };
+  return {
+    labelPrefixes: SETTINGS.labelPrefixes,
+    seats, statuses, tiers,
+    version: 3
+  };
+}
+document.getElementById('settingsSave').addEventListener('click', async () => {
+  await saveOrDownload('board/settings.json', mergedSettingsJson(), 'settings.json');
+});
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+function evPointer(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+}
+const tmpV = new THREE.Vector3();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]);
+  downAt = null;
+  if (moved > 6 || editMode) return;
+  evPointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(clickables, true);
+  for (const h of hits) {
+    let o = h.object;
+    while (o && !o.userData.info) o = o.parent;
+    if (o) {
+      tmpV.set(o.userData.anchorLocal.x, 0, o.userData.anchorLocal.z);
+      o.userData.anchorGroup.localToWorld(tmpV);
+      showDetail(o.userData.info, tmpV);
+      return;
+    }
+  }
+});
+
+renderer.domElement.addEventListener('dblclick', e => {
+  if (editMode) return;
+  evPointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  if (currentViewKey === 'all') {
+    const targets = directorGroup ? [...buildingRoomGroups, directorGroup] : buildingRoomGroups;
+    const hits = raycaster.intersectObjects(targets, true);
+    if (!hits.length) return;
+    let o = hits[0].object;
+    while (o && !o.userData.roomId) o = o.parent;
+    if (o) switchView(o.userData.roomId);
+  } else {
+    const hits = raycaster.intersectObjects(clickables, true);
+    if (!hits.length) switchView('all');
+  }
+});
+
+// チャット参照（構造化）: URLがある場合だけボタンを出す
+const chatRow = document.createElement('div');
+chatRow.className = 'row';
+chatRow.style.display = 'none';
+chatRow.innerHTML = '<b>チャット</b><span id="dChatName"></span>';
+detail.insertBefore(chatRow, detail.querySelector('.btns'));
+const dChatBtn = document.getElementById('dChat');
+function updateChatUI(info) {
+const issue = issueByNum(info.number);
+const chat = issue && issue.chat ? issue.chat : null;
+if (chat && chat.url) {
+dChatBtn.style.display = '';
+dChatBtn.href = chat.url;
+dChatBtn.target = '_blank';
+dChatBtn.rel = 'noopener';
+} else {
+dChatBtn.style.display = 'none';
+dChatBtn.removeAttribute('href');
+}
+if (chat && chat.label) {
+chatRow.style.display = '';
+const nameEl = document.getElementById('dChatName');
+nameEl.textContent = '';
+if (chat.url) {
+const a = document.createElement('a');
+a.href = chat.url; a.target = '_blank'; a.rel = 'noopener';
+a.className = 'lnk'; a.textContent = chat.label;
+nameEl.appendChild(a);
+} else {
+nameEl.textContent = chat.label;
+}
+} else {
+chatRow.style.display = 'none';
+}
+}
+
+
+// ===== 編集モード =====
+let editMode = false;
+let archiveListOpen = false;
+let selected = null; // 島 or 部署グループ
+let selectedRoom = null; // 全体ビューで選択中の部屋グループ
+const deadRoots = new Set();
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const dragPoint = new THREE.Vector3();
+let dragTarget = null;
+let dragKind = null; // island | dept | dept-resize | room
+const dragOffset = { x: 0, z: 0};
+let carryIslands = null;
+let carryStart = null;
+const editToggle = document.getElementById('editToggle');
+const editbar = document.getElementById('editbar');
+const isRoomView = () =>!!LAYOUTS[currentViewKey];
+
+function setEditMode(on) {
+editMode = on;
+if (!on) archiveListOpen = false;
+editToggle.classList.toggle('on', on);
+editToggle.textContent = on? '✏️ 編集中（終了）': '✏️ 編集モード';
+editbar.style.display = on? 'block': 'none';
+controls.enabled =!on;
+for (const g of deptEditables) g.userData.handle.visible = on && isRoomView();
+if (!on) { selected = null; selectedRoom = null; dragTarget = null; ring.visible = false;}
+renderEditbar();
+}
+editToggle.addEventListener('click', () => {
+if (!editMode && currentViewKey!== 'all' &&!isRoomView()) {
+editToggle.textContent = '全体か部屋タブで編集できます';
+setTimeout(() => { if (!editMode) editToggle.textContent = '✏️ 編集モード';}, 1600);
+return;
+}
+setEditMode(!editMode);
+});
+function mkBtn(label, fn) {
+const b = document.createElement('button');
+b.textContent = label;
+b.addEventListener('click', fn);
+return b;
+}
+function renderEditbar() {
+editbar.innerHTML = '';
+if (!editMode) return;
+const note = document.createElement('div');
+note.className = 'note';
+if (currentViewKey === 'all' && archiveListOpen) {
+editbar.appendChild(mkBtn('← 戻る', () => { archiveListOpen = false; renderEditbar(); }));
+const arch = BUILDING.rooms.filter(r => r.archived);
+if (!arch.length) {
+const empty = document.createElement('div'); empty.className = 'note';
+empty.textContent = 'アーカイブ済みの部屋はありません';
+editbar.appendChild(empty);
+}
+for (const r of arch) editbar.appendChild(mkBtn(`↩ 『${r.name}』を戻す`, () => restoreRoom(r.id)));
+note.textContent = 'アーカイブ済みの部屋の一覧です。戻すと全体ビューに再表示されます';
+editbar.appendChild(note);
+return;
+}
+if (isRoomView()) {
+editbar.append(
+mkBtn('＋ 島を追加', addIsland),
+mkBtn('＋ 机を追加', addDesk),
+mkBtn('＋ 部署を追加', addDepartment),
+mkBtn('⟳ 回転（島）', () => { if (selected && selected.userData.isIsland) rotateIsland(selected);}),
+mkBtn('🗑 削除（島・机）', deleteSelectedIsland),
+mkBtn('🗑 部署を削除（選択中）', deleteSelectedDepartment),
+mkBtn('✨ 自動整列', autoArrange),
+mkBtn('layout.json保存', saveLayout)
+);
+note.textContent = '島・部署エリアをドラッグで移動。部署の角の■を引くと大きさ変更。動かしたものは手動配置として保持されます';
+} else if (currentViewKey === 'all') {
+editbar.append(
+mkBtn('＋ 部屋を追加', addRoom),
+mkBtn('📦 選択した部屋をアーカイブ', archiveSelectedRoom),
+mkBtn('building.json保存', saveBuilding)
+);
+editbar.appendChild(mkBtn(`🗄 アーカイブ済みの部屋（${BUILDING.rooms.filter(r => r.archived).length}）`, () => { archiveListOpen = true; renderEditbar(); }));
+note.textContent = '部屋をドラッグすると並び替え。アーカイブの確認と復元は「アーカイブ済みの部屋」から';
+}
+editbar.appendChild(note);
+}
+function selectIsland(g) {
+selected = g;
+g.getWorldPosition(tmpV);
+ring.position.set(tmpV.x, 0.13, tmpV.z);
+ring.scale.setScalar(3.6);
+ring.material.color.set(0xd9a441);
+ring.visible = true;
+}
+function selectDept(g) {
+selected = g;
+const dept = g.userData.layoutRef;
+g.getWorldPosition(tmpV);
+ring.position.set(tmpV.x, 0.13, tmpV.z);
+ring.scale.setScalar(Math.max(dept.w, dept.d) / 1.35);
+ring.material.color.set(0xd9a441);
+ring.visible = true;
+}
+function selectRoomGroup(g) {
+selectedRoom = g;
+ring.position.set(g.position.x, 0.13, g.position.z);
+ring.scale.setScalar(roomBoxW(BUILDING.rooms.find(r => r.id === g.userData.roomId)) / 1.35);
+ring.material.color.set(0xd9a441);
+ring.visible = true;
+}
+function pickChain(e, targets, flag) {
+evPointer(e);
+raycaster.setFromCamera(pointer, camera);
+const hits = raycaster.intersectObjects(targets, true);
+if (!hits.length) return null;
+let o = hits[0].object;
+while (o &&!o.userData[flag]) o = o.parent;
+return o? { group: o, hit: hits[0].object}: null;
+}
+renderer.domElement.addEventListener('pointerdown', e => {
+if (!editMode) return;
+if (isRoomView()) {
+const dh = pickChain(e, deptEditables, 'isDept');
+if (dh) {
+let o = dh.hit, isHandle = false;
+while (o && o!== dh.group) { if (o.userData.isHandle) { isHandle = true; break;} o = o.parent;}
+dragTarget = dh.group;
+dragKind = isHandle? 'dept-resize': 'dept';
+selectDept(dh.group);
+if (!isHandle) {
+const dept = dh.group.userData.layoutRef;
+carryStart = { x: dh.group.position.x, z: dh.group.position.z };
+carryIslands = editables.filter(g =>
+Math.abs(g.position.x - dh.group.position.x) <= (dept.w || 4.4) / 2 + 0.05 &&
+Math.abs(g.position.z - dh.group.position.z) <= (dept.d || 3.1) / 2 + 0.05
+).map(g => ({ g, x: g.position.x, z: g.position.z }));
+} else { carryIslands = null; carryStart = null; }
+raycaster.setFromCamera(pointer, camera);
+if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
+dragOffset.x = dh.group.position.x - dragPoint.x;
+dragOffset.z = dh.group.position.z - dragPoint.z;
+}
+return;
+}
+const ih = pickChain(e, editables, 'isIsland');
+if (ih) {
+dragTarget = ih.group;
+dragKind = 'island';
+selectIsland(ih.group);
+raycaster.setFromCamera(pointer, camera);
+if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
+dragOffset.x = ih.group.position.x - dragPoint.x;
+dragOffset.z = ih.group.position.z - dragPoint.z;
+}
+return;
+}
+selected = null;
+ring.visible = false;
+} else if (currentViewKey === 'all') {
+const rh = pickChain(e, buildingRoomGroups, 'roomId');
+if (rh) {
+dragTarget = rh.group;
+dragKind = 'room';
+selectRoomGroup(rh.group);
+raycaster.setFromCamera(pointer, camera);
+if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
+dragOffset.x = rh.group.position.x - dragPoint.x;
+dragOffset.z = rh.group.position.z - dragPoint.z;
+}
+return;
+}
+selectedRoom = null;
+ring.visible = false;
+}
+});
+renderer.domElement.addEventListener('pointermove', e => {
+if (!editMode ||!dragTarget) return;
+evPointer(e);
+raycaster.setFromCamera(pointer, camera);
+if (!raycaster.ray.intersectPlane(dragPlane, dragPoint)) return;
+const snap = v => Math.round(v / 0.2) * 0.2;
+const ref = dragTarget.userData.layoutRef;
+if (dragKind === 'island' || dragKind === 'dept') {
+dragTarget.position.x = snap(dragPoint.x + dragOffset.x);
+dragTarget.position.z = snap(dragPoint.z + dragOffset.z);
+if (ref) { ref.x = dragTarget.position.x; ref.z = dragTarget.position.z; ref.manual = true;}
+if (dragKind === 'dept' && carryIslands && carryStart) {
+const dx = dragTarget.position.x - carryStart.x;
+const dz = dragTarget.position.z - carryStart.z;
+for (const c of carryIslands) {
+c.g.position.x = snap(c.x + dx);
+c.g.position.z = snap(c.z + dz);
+const cr = c.g.userData.layoutRef;
+if (cr) { cr.x = c.g.position.x; cr.z = c.g.position.z; cr.manual = true; }
+}
+}
+dragTarget.getWorldPosition(tmpV);
+ring.position.set(tmpV.x, 0.13, tmpV.z);
+} else if (dragKind === 'dept-resize' && ref) {
+ref.w = THREE.MathUtils.clamp(Math.abs(dragPoint.x - dragTarget.position.x) * 2, 2.6, 12);
+ref.d = THREE.MathUtils.clamp(Math.abs(dragPoint.z - dragTarget.position.z) * 2, 2.2, 10);
+ref.manual = true;
+refreshDeptRug(dragTarget);
+ring.scale.setScalar(Math.max(ref.w, ref.d) / 1.35);
+} else if (dragKind === 'room') {
+dragTarget.position.x = dragPoint.x + dragOffset.x;
+dragTarget.position.z = dragPoint.z + dragOffset.z;
+ring.position.set(dragTarget.position.x, 0.13, dragTarget.position.z);
+}
+});
+addEventListener('pointerup', () => {
+if (dragKind === 'room' && dragTarget) {
+const sorted = [...buildingRoomGroups].sort((a, b) => {
+const ra = Math.round(a.position.z / gridCell.d), rb = Math.round(b.position.z / gridCell.d);
+return ra !== rb ? ra - rb : a.position.x - b.position.x;
+});
+sorted.forEach((g, i) => {
+const room = BUILDING.rooms.find(r => r.id === g.userData.roomId);
+if (room) room.slot = i;
+});
+packBuilding();
+if (selectedRoom) selectRoomGroup(selectedRoom);
+}
+carryIslands = null;
+carryStart = null;
+dragTarget = null;
+dragKind = null;
+});
+function rotateIsland(g) {
+g.rotation.y += Math.PI / 2;
+const ref = g.userData.layoutRef;
+if (ref) {
+ref.rotationDeg = ((Math.round(THREE.MathUtils.radToDeg(g.rotation.y)) % 360) + 360) % 360;
+ref.manual = true;
+}
+}
+function deleteSelectedIsland() {
+if (!selected || !selected.userData.isIsland) return;
+const L = LAYOUTS[currentViewKey];
+const ref = selected.userData.layoutRef;
+if (L && ref) {
+const occupants = resolveRoom(L, currentViewKey).filter(s => s.isl === ref && s.issue).length;
+if (occupants > 0 && !confirm(`この島には ${occupants} 人が座っています。削除しますか？（Issueは残り、別の席に自動で座ります）`)) return;
+}
+selected.traverse(o => { if (o.userData.info) deadRoots.add(o);});
+if (selected.parent) selected.parent.remove(selected);
+if (L && ref) L.islands = L.islands.filter(i => i!== ref);
+editables = editables.filter(g => g!== selected);
+clickables = clickables.filter(c => {
+let o = c;
+while (o) { if (o === selected) return false; o = o.parent;}
+return true;
+});
+selected = null;
+ring.visible = false;
+}
+const DEPT_RUG_COLORS = ['#e8e2d0', '#dfe8dc', '#e3e0ee', '#eee0da', '#dde7ec'];
+function ensureDepartment(L) {
+if (!L.departments.length) {
+L.departments.push({ id: 'main', name: 'メイン', rugColor: DEPT_RUG_COLORS[0]});
+}
+return L.departments[0];
+}
+function addDepartment() {
+const L = LAYOUTS[currentViewKey];
+if (!L) return;
+const n = L.departments.length + 1;
+L.departments.push({
+id: 'dept-' + Date.now().toString(36),
+name: '部署' + n,
+rugColor: DEPT_RUG_COLORS[L.departments.length % DEPT_RUG_COLORS.length]
+});
+const was = editMode;
+switchView(currentViewKey);
+if (was) setEditMode(true);
+}
+function deleteSelectedDepartment() {
+const L = LAYOUTS[currentViewKey];
+if (!L || !selected || !selected.userData.isDept) return;
+if (L.departments.length <= 1) { alert('最後の部署は削除できません'); return; }
+const dept = selected.userData.layoutRef;
+const fallback = L.departments.find(d => d !== dept);
+const moved = L.islands.filter(i => i.department === dept.id);
+for (const isl of moved) isl.department = fallback.id;
+L.departments = L.departments.filter(d => d !== dept);
+selected = null;
+const was = editMode;
+switchView(currentViewKey);
+if (was) setEditMode(true);
+}
+function addIsland() {
+const L = LAYOUTS[currentViewKey];
+if (!L) return;
+ensureDepartment(L);
+const nl = {
+id: 'isl-' + Date.now().toString(36), department: L.departments[0].id,
+x: 0, z: 1.4, rotationDeg: 0, manual: true,
+managerSeats: [ { issue: null}],
+memberSeats: [ { issue: null}, { issue: null}, { issue: null}, { issue: null}]
+};
+L.islands.push(nl);
+selectIsland(buildIsland(viewGroup, nl, []));
+}
+function addDesk() {
+const L = LAYOUTS[currentViewKey];
+if (!L) return;
+ensureDepartment(L);
+const nl = {
+id: 'desk-' + Date.now().toString(36), department: L.departments[0].id,
+x: 0, z: 1.4, rotationDeg: 0, manual: true,
+managerSeats: [],
+memberSeats: [ { issue: null}]
+};
+L.islands.push(nl);
+selectIsland(buildIsland(viewGroup, nl, []));
+}
+function autoArrange() {
+const L = LAYOUTS[currentViewKey];
+if (!L) return;
+autoLayout(L, true);
+const was = editMode;
+switchView(currentViewKey);
+if (was) setEditMode(true);
+}
+function cleanLayout(L, roomId) {
+// ピン留めだけを保存する（自動着席の結果は書き戻さない）
+return {
+version: 2,
+size: L.size,
+departments: L.departments.map(d => {
+const { _cols, _rows, ...rest } = d;
+return rest;
+}),
+islands: L.islands.map(isl => ({
+...isl,
+managerSeats: isl.managerSeats.map(s => ({ issue: s.issue ?? null })),
+memberSeats: isl.memberSeats.map(s => ({ issue: s.issue ?? null }))
+})),
+props: L.props || []
+};
+}
+function downloadJson(obj, filename) {
+const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json'});
+const a = document.createElement('a');
+a.href = URL.createObjectURL(blob);
+a.download = filename;
+a.click();
+URL.revokeObjectURL(a.href);
+}
+// ===== サーバーへの保存（契約：POST /api/files） =====
+let toastTimer = null;
+function showToast(msg) {
+const el = document.getElementById('toast');
+el.textContent = msg;
+el.classList.add('show');
+clearTimeout(toastTimer);
+toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function showErrorBanner(msg) {
+const el = document.getElementById('errBanner');
+el.textContent = msg;
+el.style.display = 'block';
+}
+function hideErrorBanner() {
+document.getElementById('errBanner').style.display = 'none';
+}
+async function postFile(path, content) {
+const res = await fetch('/api/files', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ path, content })
+});
+if (!res.ok) throw new Error('HTTP ' + res.status);
+return res.json();
+}
+async function saveOrDownload(path, content, filename) {
+try {
+await postFile(path, content);
+showToast('保存しました');
+return true;
+} catch (e) {
+downloadJson(content, filename);
+showToast('サーバーへの保存に失敗したため、ダウンロードで保存しました');
+return false;
+}
+}
+// settingsToJson() の結果を SETTINGS_RAW にマージする。
+// UI が知らないキー（version、tiers._note、その他の未知キー）を消さないため。
+function mergedSettingsJson() {
+const out = settingsToJson();
+if (!SETTINGS_RAW) return out;
+const merged = JSON.parse(JSON.stringify(SETTINGS_RAW));
+merged.statuses = out.statuses;
+merged.seats = out.seats;
+merged.tiers = out.tiers;
+if (SETTINGS_RAW.tiers && SETTINGS_RAW.tiers._note !== undefined) merged.tiers._note = SETTINGS_RAW.tiers._note;
+merged.labelPrefixes = out.labelPrefixes;
+if (SETTINGS_RAW.version !== undefined) merged.version = SETTINGS_RAW.version;
+return merged;
+}
+function saveLayout() {
+const roomId = currentViewKey;
+if (!LAYOUTS[roomId]) return;
+saveOrDownload(`rooms/${roomId}/layout.json`, cleanLayout(LAYOUTS[roomId], roomId), `layout-${roomId}.json`);
+}
+function addRoom() {
+const n = BUILDING.rooms.length + 1;
+const id = 'room-' + Date.now().toString(36);
+BUILDING.rooms.push({ id, name: '新しい部屋' + n, slot: 99, archived: false});
+LAYOUTS[id] = {
+version: 2,
+departments: [ { id: 'main', name: 'メイン', rugColor: '#e8e2d0'}],
+islands: [],
+props: []
+};
+LAYOUTS[id] = effectiveLayout(id);
+BUILDING.rooms.forEach((r, i) => { if (!r.archived) r.slot = visibleRooms().findIndex(v => v.id === r.id);});
+buildTabs();
+switchView('all');
+setEditMode(true);
+}
+function archiveSelectedRoom() {
+if (!selectedRoom) return;
+const room = BUILDING.rooms.find(r => r.id === selectedRoom.userData.roomId);
+if (!room) return;
+const openCount = ISSUES.filter(i => i.room === room.id && i.state === 'open').length;
+const msg = openCount > 0
+? `『${room.name}』には作業中のIssueが ${openCount} 件あります。アーカイブしますか？（部屋のデータは消えません）`
+: `『${room.name}』をアーカイブしますか？（部屋のデータは消えません）`;
+if (!confirm(msg)) return;
+room.archived = true;
+selectedRoom = null;
+buildTabs();
+switchView('all');
+}
+function restoreRoom(id) {
+const room = BUILDING.rooms.find(r => r.id === id);
+if (!room) return;
+room.archived = false;
+archiveListOpen = BUILDING.rooms.some(r => r.archived);
+room.slot = visibleRooms().length;
+buildTabs();
+switchView('all');
+setEditMode(true);
+}
+function saveBuilding() {
+saveOrDownload('board/building.json', BUILDING, 'building.json');
+}
+
+// ===== 付箋一覧モード =====
+const LANES = [
+  { key: 'not_started', title: '未着手', color: '#9AA5A0' },
+  { key: 'working', title: '作業中', color: '#0E8A16' },
+  { key: 'waiting_approval', title: '承認待ち', color: '#B60205' },
+  { key: 'waiting_review', title: '確認待ち', color: '#1D76DB' },
+  { key: 'done', title: '完了', color: '#6B7280' }
+];
+const laneOf = iss => iss.state === 'closed' ? 'done' : iss.status;
+function roomColorOf(iss) {
+  if (iss.seat === 'director') return '#d9a441';
+  const idx = BUILDING.rooms.findIndex(r => r.id === iss.room);
+  if (idx < 0) return '#9aa5a0';
+  return '#' + ROOM_ACCENTS[idx % ROOM_ACCENTS.length].toString(16).padStart(6, '0');
+}
+function roomNameOf(iss) {
+  if (iss.seat === 'director') return '社長室';
+  const r = BUILDING.rooms.find(r => r.id === iss.room);
+  return r ? r.name : '（部屋なし）';
+}
+let boardFilter = 'all';
+let boardGroup = 'status';
+const boardEl = document.getElementById('board');
+const lanesEl = document.getElementById('lanes');
+const boardBarEl = document.getElementById('boardBar');
+function stickyCard(iss) {
+  const card = document.createElement('div');
+  card.className = 'sticky';
+  card.style.borderTopColor = roomColorOf(iss);
+  card.draggable = true;
+  const seatDef = iss.seat ? SETTINGS.seats[iss.seat] : null;
+  const seatMark = seatDef ? seatDef.display : '席なし';
+  card.innerHTML = `
+    <span class="roomTag" style="background:${roomColorOf(iss)}">${roomNameOf(iss)}</span>
+    <div class="ttl">${iss.title}</div>
+    <div class="meta">${iss.assignee || '担当未記入'}（${seatMark}） / #${iss.number}${iss.parent ? ` / 親 #${iss.parent}` : ''}</div>
+    ${iss.out ? `<div class="meta">成果物：${iss.out}</div>` : ''}
+    ${iss.status === 'waiting_approval' && iss.ask ? `<div class="ask">承認待ち：${iss.ask}</div>` : ''}
+    ${iss.reportTo && iss.status === 'waiting_review' ? `<div class="meta">報告先：${iss.reportTo.name}</div>` : ''}`;
+  card.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', String(iss.number));
+  });
+  card.addEventListener('click', () => {
+    showDetail(infoOf(iss), { x: 0, z: 0 });
+    ring.visible = false;
+  });
+  return card;
+}
+function renderBoardBar() {
+  boardBarEl.innerHTML = '';
+  const mk = (label, key) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (boardFilter === key ? ' on' : '');
+    b.textContent = label;
+    b.addEventListener('click', () => { boardFilter = key; renderBoard(); });
+    boardBarEl.appendChild(b);
+  };
+  mk('すべて', 'all');
+  mk('社長室', 'director');
+  for (const r of BUILDING.rooms) mk(r.name, r.id);
+  const sp = document.createElement('div');
+  sp.className = 'spacer';
+  boardBarEl.appendChild(sp);
+  const g = document.createElement('button');
+  g.className = 'chip';
+  g.textContent = boardGroup === 'status' ? '並び：状態別' : '並び：プロジェクト別';
+  g.addEventListener('click', () => {
+    boardGroup = boardGroup === 'status' ? 'project' : 'status';
+    renderBoard();
+  });
+  boardBarEl.appendChild(g);
+}
+function boardIssues() {
+  return ISSUES
+    .filter(i => i.seat === 'director' || i.room)
+    .filter(i => boardFilter === 'all' ? true
+      : boardFilter === 'director' ? i.seat === 'director'
+      : i.room === boardFilter);
+}
+function moveIssueToLane(num, laneKey) {
+  const iss = issueByNum(num);
+  if (!iss) return;
+  if (laneKey === 'done') { iss.state = 'closed'; }
+  else { iss.state = 'open'; iss.status = laneKey; }
+  renderBoard();
+}
+function renderBoard() {
+  renderBoardBar();
+  lanesEl.innerHTML = '';
+  const list = boardIssues();
+  if (boardGroup === 'status') {
+    lanesEl.style.flexDirection = 'row';
+    for (const lane of LANES) {
+      const items = list.filter(i => laneOf(i) === lane.key);
+      const el = document.createElement('div');
+      el.className = 'lane';
+      el.innerHTML = `<h3><span class="dot" style="background:${lane.color}"></span>${lane.title} <span class="cnt">${items.length}</span></h3>`;
+      items.forEach(i => el.appendChild(stickyCard(i)));
+      el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+      el.addEventListener('dragleave', () => el.classList.remove('over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.classList.remove('over');
+        moveIssueToLane(Number(e.dataTransfer.getData('text/plain')), lane.key);
+      });
+      lanesEl.appendChild(el);
+    }
+  } else {
+    lanesEl.style.flexDirection = 'column';
+    const groups = new Map();
+    for (const i of list) {
+      const key = i.seat === 'director' ? 'director' : i.room;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(i);
+    }
+    const order = { not_started: 0, working: 1, waiting_approval: 2, waiting_review: 3, done: 4 };
+    for (const [key, items] of groups) {
+      items.sort((a, b) => order[laneOf(a)] - order[laneOf(b)] || a.number - b.number);
+      const g = document.createElement('div');
+      g.className = 'projGroup';
+      const name = key === 'director' ? '社長室' : (BUILDING.rooms.find(r => r.id === key)?.name || key);
+      g.innerHTML = `<h3>${name} <span style="color:#7d8a8a">${items.length}件</span></h3>`;
+      const cards = document.createElement('div');
+      cards.className = 'cards';
+      items.forEach(i => {
+        const c = stickyCard(i);
+        const lane = LANES.find(l => l.key === laneOf(i)) || { color: '#9AA5A0', title: '状態なし' };
+        const chip = document.createElement('div');
+        chip.className = 'meta';
+        chip.innerHTML = `<span class="dot" style="background:${lane.color}"></span>${lane.title}`;
+        c.appendChild(chip);
+        cards.appendChild(c);
+      });
+      g.appendChild(cards);
+      lanesEl.appendChild(g);
+    }
+  }
+}
+let viewMode = '3d';
+function setViewMode(m) {
+  viewMode = m;
+  document.getElementById('mode3d').classList.toggle('on', m === '3d');
+  document.getElementById('modeBoard').classList.toggle('on', m === 'board');
+  const isBoard = m === 'board';
+  boardEl.style.display = isBoard ? 'flex' : 'none';
+  editToggle.style.display = isBoard ? 'none' : '';
+  if (isBoard) {
+    if (editMode) setEditMode(false);
+    renderBoard();
+  } else {
+    closeDetail();
+    switchView(currentViewKey);
+  }
+}
+document.getElementById('mode3d').addEventListener('click', () => setViewMode('3d'));
+document.getElementById('modeBoard').addEventListener('click', () => setViewMode('board'));
+
+// ===== アニメーション =====
+const clockT = new THREE.Clock();
+function tick() {
+const t = clockT.getElapsedTime();
+for (const a of animated) {
+if (deadRoots.has(a.root)) continue;
+if (a.kind === 'working') {
+a.armL.rotation.x = 1.35 + Math.sin(t * 11 + a.phase) * 0.1;
+a.armR.rotation.x = 1.35 + Math.sin(t * 11 + a.phase + Math.PI) * 0.1;
+a.headG.position.y = 0.92 + Math.abs(Math.sin(t * 5.5 + a.phase)) * 0.012;
+} else if (a.kind === 'waiting_approval') {
+a.armR.rotation.z = Math.sin(t * 3 + a.phase) * 0.18;
+if (a.bang) {
+const s = 0.34 + Math.sin(t * 4 + a.phase) * 0.03;
+a.bang.scale.set(s, s, 1);
+}
+} else {
+a.headG.position.y = 0.92 + Math.sin(t * 1.6 + a.phase) * 0.008;
+}
+}
+controls.update();
+renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(tick);
+
+// ===== 実データ取得（契約：GET /api/company）と起動 =====
+function hexNum(c) {
+  if (typeof c === 'number') return c;
+  if (typeof c === 'string') {
+    const n = parseInt(c.replace(/^#/, ''), 16);
+    return Number.isNaN(n) ? 0 : n;
+  }
+  return 0;
+}
+// repo 形式（色は "9AA5A0" のような文字列）→ 描画用（color は数値）へ変換。
+// 変換前の生オブジェクトは SETTINGS_RAW に保持する（保存時のマージ用）。
+// tiers の _note は描画用から除くが RAW には残る。
+function convertSettings(raw) {
+  SETTINGS_RAW = JSON.parse(JSON.stringify(raw));
+  const s = {
+    statuses: {}, seats: {}, tiers: {},
+    labelPrefixes: raw.labelPrefixes || { role: 'role:', room: 'room:' }
+  };
+  for (const [k, v] of Object.entries(raw.statuses || {})) {
+    s.statuses[k] = { label: v.label, display: v.display, color: hexNum(v.color) };
+  }
+  for (const [k, v] of Object.entries(raw.seats || {})) {
+    s.seats[k] = { label: v.label, display: v.display };
+  }
+  for (const [k, v] of Object.entries(raw.tiers || {})) {
+    if (k === '_note') continue;
+    s.tiers[k] = { name: v.name, color: hexNum(v.color) };
+  }
+  return s;
+}
+async function loadCompany() {
+  const res = await fetch('/api/company');
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  SETTINGS = convertSettings(data.settings || {});
+  BUILDING = data.building || BUILDING;
+  LAYOUTS = data.layouts || {};
+  ISSUES = (data.issues || []).map(i => ({ ...i, bucho: i.seat === 'bucho' }));
+  REPO_NAME = data.repo || null;
+}
+function normalizeLayouts() {
+  for (const id of Object.keys(LAYOUTS)) LAYOUTS[id] = effectiveLayout(id);
+}
+function boot() {
+  normalizeLayouts();
+  buildTabs();
+  switchView('all');
+}
+async function refreshData() {
+  try {
+    await loadCompany();
+    document.getElementById('repoName').textContent = REPO_NAME || 'デモデータ';
+    hideErrorBanner();
+    normalizeLayouts();
+    buildTabs();
+    switchView(currentViewKey);
+    if (settingsEl.classList.contains('open')) renderSettings();
+    showToast('最新のデータを取得しました');
+  } catch (e) {
+    showToast('再取得に失敗しました');
+  }
+}
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
+(async function init() {
+  let live = false;
+  try {
+    await loadCompany();
+    live = true;
+  } catch (e) {
+    showErrorBanner('サーバーからデータを取得できませんでした。デモデータを表示しています。');
+  }
+  document.getElementById('repoName').textContent = live && REPO_NAME ? REPO_NAME : 'デモデータ';
+  boot();
+})();
+
+addEventListener('resize', fitRenderer);
+</script>
+</body>
+</html>
