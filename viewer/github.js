@@ -209,6 +209,7 @@
         title: p.iss.title,
         state: p.iss.state,
         url: p.iss.html_url,
+        updatedAt: p.iss.updated_at || null,
         seat: p.seat,
         status: p.status,
         room: p.room,
