@@ -176,12 +176,43 @@
     max-width:92vw; text-align:center;
   }
   #toast.show { opacity:1; }
+  #connectOverlay {
+    position:fixed; inset:0; z-index:40; display:none;
+    background:rgba(38,48,48,.45); align-items:center; justify-content:center;
+  }
+  #connectOverlay.open { display:flex; }
+  .connectCard {
+    background:#fff; border-radius:14px; padding:22px 24px; width:min(480px, 92vw);
+    max-height:90vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.25);
+    font-size:13px; color:#3f4a4a;
+  }
+  .connectCard .ttl { font-size:16px; font-weight:700; margin-bottom:8px; }
+  .connectCard label { display:block; margin:12px 0 0; font-weight:600; }
+  .connectCard input {
+    display:block; width:100%; box-sizing:border-box; margin-top:4px;
+    padding:8px 10px; border:1px solid #cfd8d4; border-radius:8px; font-size:13px;
+  }
+  .connectCard details { margin-top:12px; }
+  .connectCard .btns { display:flex; gap:8px; margin-top:16px; }
+  .connectCard .btns button {
+    border:none; cursor:pointer; border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600;
+  }
+  #connConnect { background:#35507a; color:#fff; }
+  #connCancel { background:#eef3f0; color:#3f4a4a; }
+  #connError { color:#b60205; margin-top:10px; display:none; }
+  .connectHelp { color:#7d8a8a; font-size:12px; margin-top:14px; line-height:1.6; }
+  #connBox { border-top:1px solid #e3eae6; margin-top:14px; padding-top:12px; }
+  #connBox .ttl2 { font-weight:700; margin-bottom:4px; }
+  #connBox button {
+    border:none; cursor:pointer; background:#eef3f0; color:#3f4a4a;
+    border-radius:8px; padding:5px 12px; font-size:12px; font-weight:600; margin-top:6px;
+  }
 </style>
 <script type="importmap">
 {
   "imports": {
-    "three": "/vendor/three.module.js",
-    "three/addons/": "/vendor/"
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/"
   }
 }
 </script>
@@ -191,6 +222,24 @@
 <div id="tabs"></div>
 <div id="errBanner"></div>
 <div id="toast"></div>
+<div id="connectOverlay">
+  <div class="connectCard">
+    <div class="ttl">会社に接続する</div>
+    <p>会社リポジトリ（GitHub）と、そのリポジトリ専用のトークンを入力してください。トークンはこのブラウザの中にだけ保存されます。</p>
+    <label>会社リポジトリ<input id="connRepo" placeholder="owner/repository" autocomplete="off"></label>
+    <label>トークン<input id="connToken" type="password" placeholder="github_pat_..." autocomplete="off"></label>
+    <details>
+      <summary>詳細設定（通常は不要です）</summary>
+      <label>API の URL<input id="connApi" placeholder="https://api.github.com" autocomplete="off"></label>
+    </details>
+    <div id="connError"></div>
+    <div class="btns">
+      <button id="connConnect">接続する</button>
+      <button id="connCancel">あとで</button>
+    </div>
+    <p class="connectHelp">トークンの作り方：GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で、対象の会社リポジトリだけを選び、Repository permissions の Issues と Contents を Read and write にします。PC ごとにトークンを分けると、不要になった PC の分だけを消せて安全です。</p>
+  </div>
+</div>
 <div class="panel">
   <b>TinyCompany</b>
   <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">🔄 再取得</button></div>
@@ -233,9 +282,15 @@
   <div class="btns">
     <button id="settingsSave">settings.json保存</button>
   </div>
-  <div class="note">変更は凡例へすぐ、3D表示へは少し遅れて反映されます。「settings.json保存」でサーバー経由でリポジトリの board/settings.json に保存されます（失敗した場合はダウンロードになります）。ラベル名そのものは意味キーとして固定です。</div>
+  <div id="connBox">
+    <div class="ttl2">接続先</div>
+    <div id="connInfo">未接続（デモデータを表示中）</div>
+    <button id="connChange">接続を変更する</button>
+  </div>
+  <div class="note">変更は凡例へすぐ、3D表示へは少し遅れて反映されます。「settings.json保存」で接続先のリポジトリの board/settings.json に保存されます（失敗した場合はダウンロードになります）。ラベル名そのものは意味キーとして固定です。</div>
 </div>
 
+<script src="./github.js"></script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1832,7 +1887,7 @@ a.download = filename;
 a.click();
 URL.revokeObjectURL(a.href);
 }
-// ===== サーバーへの保存（契約：POST /api/files） =====
+// ===== 接続先への保存（ブラウザから Contents API へ直接） =====
 let toastTimer = null;
 function showToast(msg) {
 const el = document.getElementById('toast');
@@ -1850,13 +1905,9 @@ function hideErrorBanner() {
 document.getElementById('errBanner').style.display = 'none';
 }
 async function postFile(path, content) {
-const res = await fetch('/api/files', {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ path, content })
-});
-if (!res.ok) throw new Error('HTTP ' + res.status);
-return res.json();
+const cfg = window.TCGitHub && TCGitHub.getConfig();
+if (!cfg) throw new Error('not connected');
+return TCGitHub.saveFile(cfg, path, content);
 }
 async function saveOrDownload(path, content, filename) {
 try {
@@ -1865,7 +1916,7 @@ showToast('保存しました');
 return true;
 } catch (e) {
 downloadJson(content, filename);
-showToast('サーバーへの保存に失敗したため、ダウンロードで保存しました');
+showToast('接続先への保存に失敗したため、ダウンロードで保存しました');
 return false;
 }
 }
@@ -2114,7 +2165,7 @@ renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(tick);
 
-// ===== 実データ取得（契約：GET /api/company）と起動 =====
+// ===== 実データ取得（ブラウザから GitHub API へ直接）と起動 =====
 function hexNum(c) {
   if (typeof c === 'number') return c;
   if (typeof c === 'string') {
@@ -2145,9 +2196,9 @@ function convertSettings(raw) {
   return s;
 }
 async function loadCompany() {
-  const res = await fetch('/api/company');
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const data = await res.json();
+  const cfg = window.TCGitHub && TCGitHub.getConfig();
+  if (!cfg) throw new Error('not connected');
+  const data = await TCGitHub.loadCompany(cfg);
   SETTINGS = convertSettings(data.settings || {});
   BUILDING = data.building || BUILDING;
   LAYOUTS = data.layouts || {};
@@ -2177,16 +2228,75 @@ async function refreshData() {
   }
 }
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
+// ===== 接続パネル =====
+const connectOverlay = document.getElementById('connectOverlay');
+const connInfoEl = document.getElementById('connInfo');
+function updateConnInfo() {
+  const cfg = window.TCGitHub && TCGitHub.getConfig();
+  connInfoEl.textContent = cfg ? cfg.repo : '未接続（デモデータを表示中）';
+}
+function openConnect() {
+  const cfg = window.TCGitHub && TCGitHub.getConfig();
+  if (cfg) {
+    document.getElementById('connRepo').value = cfg.repo || '';
+    document.getElementById('connApi').value = cfg.apiBase && cfg.apiBase !== 'https://api.github.com' ? cfg.apiBase : '';
+  }
+  document.getElementById('connError').style.display = 'none';
+  connectOverlay.classList.add('open');
+}
+function closeConnect() { connectOverlay.classList.remove('open'); }
+document.getElementById('connCancel').addEventListener('click', closeConnect);
+document.getElementById('connChange').addEventListener('click', openConnect);
+document.getElementById('connConnect').addEventListener('click', async () => {
+  const repo = document.getElementById('connRepo').value.trim();
+  const token = document.getElementById('connToken').value.trim();
+  const api = document.getElementById('connApi').value.trim();
+  const errEl = document.getElementById('connError');
+  const prev = window.TCGitHub && TCGitHub.getConfig();
+  const cfg = {
+    repo,
+    token: token || (prev && prev.repo === repo ? prev.token : ''),
+    apiBase: api || 'https://api.github.com'
+  };
+  if (!cfg.repo || !cfg.token) {
+    errEl.textContent = '会社リポジトリとトークンを入力してください。';
+    errEl.style.display = 'block';
+    return;
+  }
+  const btn = document.getElementById('connConnect');
+  btn.disabled = true;
+  btn.textContent = '接続中…';
+  try {
+    await TCGitHub.validate(cfg);
+    TCGitHub.saveConfig(cfg);
+    updateConnInfo();
+    closeConnect();
+    document.getElementById('connToken').value = '';
+    await refreshData();
+  } catch (e) {
+    errEl.textContent = '接続できませんでした。リポジトリ名とトークンを確認してください。（' + (e && e.message ? e.message : e) + '）';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '接続する';
+  }
+});
+
 (async function init() {
   let live = false;
+  const hasCfg = !!(window.TCGitHub && TCGitHub.getConfig());
   try {
     await loadCompany();
     live = true;
   } catch (e) {
-    showErrorBanner('サーバーからデータを取得できませんでした。デモデータを表示しています。');
+    showErrorBanner(hasCfg
+      ? '会社データを取得できませんでした。デモデータを表示しています。接続先は設定から変更できます。'
+      : '会社に接続すると、あなたの会社のボードが表示されます。今はデモデータを表示しています。');
   }
   document.getElementById('repoName').textContent = live && REPO_NAME ? REPO_NAME : 'デモデータ';
+  updateConnInfo();
   boot();
+  if (!hasCfg) openConnect();
 })();
 
 addEventListener('resize', fitRenderer);
