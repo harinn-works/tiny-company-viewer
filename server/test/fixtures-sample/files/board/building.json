@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "director": {
+    "issue": 1
+  },
+  "rooms": [
+    {
+      "id": "lab",
+      "name": "サンプル室",
+      "slot": 0,
+      "archived": false
+    }
+  ]
+}

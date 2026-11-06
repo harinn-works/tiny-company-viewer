@@ -1,0 +1,62 @@
+{
+  "labelPrefixes": {
+    "role": "role:",
+    "room": "room:"
+  },
+  "seats": {
+    "bucho": {
+      "display": "部長",
+      "label": "seat:部長"
+    },
+    "director": {
+      "display": "総監督",
+      "label": "seat:総監督"
+    },
+    "member": {
+      "display": "部下",
+      "label": "seat:部下"
+    },
+    "secretary": {
+      "display": "秘書",
+      "label": "seat:秘書"
+    }
+  },
+  "statuses": {
+    "not_started": {
+      "color": "9AA5A0",
+      "display": "未着手",
+      "label": "status:未着手"
+    },
+    "waiting_approval": {
+      "color": "B60205",
+      "display": "承認待ち",
+      "label": "status:承認待ち"
+    },
+    "waiting_review": {
+      "color": "1D76DB",
+      "display": "確認待ち",
+      "label": "status:確認待ち"
+    },
+    "working": {
+      "color": "0E8A16",
+      "display": "作業中",
+      "label": "status:作業中"
+    }
+  },
+  "tiers": {
+    "0": {
+      "color": "35507A",
+      "name": "部長"
+    },
+    "_note": "キーは sub-issue ツリーの深さ（部長=0）。深い階層に名前と色を付けたい場合は \"1\" \"2\" のようにキーを足す。定義のない深さは default を使う。既定では部下は深さによらず一律グレー。",
+    "default": {
+      "color": "A9BFD2",
+      "name": "部下"
+    },
+    "director": {
+      "color": "243447",
+      "name": "社長"
+    }
+  },
+  "version": 3
+}
