@@ -9,11 +9,19 @@ TinyCompany の会社 repo（GitHub）を表示するビューアです。
 
 ## 使い方
 
-1. ビューアのページを開く（公開されている URL、またはこの repo の `viewer/` フォルダを静的ホスティング／ローカルの静的サーバーで配信したもの）
-2. 最初の1回だけ「会社に接続する」画面で、会社リポジトリ（`owner/repository`）と、その repo 専用のトークンを入力して「接続する」を押す
-3. 次からは、ページを開くだけで自分の会社が表示されます
+自分の PC で見る場合（標準）：
 
-デスクトップにページのショートカット（URL のショートカットファイル）を置いておくと、見たいときにアイコンからすぐ開けます。
+1. この repo をダウンロード（ZIP）して展開する
+2. OS に合った起動ファイルをダブルクリックする
+   - Windows：`start-viewer.bat`（追加のインストールは不要です。Windows 標準の機能だけで小さなサーバーが立ち上がり、ブラウザが開きます）
+   - Mac：`start-viewer.command`（初回だけ、右クリック→「開く」が必要な場合があります）
+   - Linux：`start-viewer.sh` を実行する
+3. 最初の1回だけ「会社に接続する」画面で、会社リポジトリ（`owner/repository`）と、その repo 専用のトークンを入力して「接続する」を押す
+4. 次からは、起動ファイルをダブルクリックするだけで自分の会社が表示されます
+
+デスクトップに起動ファイルのショートカットを置いておくと、見たいときにすぐ開けます。
+
+公開されている URL（ホスティング済みのページ）がある場合は、そちらを開いても同じように使えます。
 
 ### 複数の PC で見る場合
 
@@ -40,6 +48,7 @@ GitHub の Settings → Developer settings → Personal access tokens → **Fine
 - `viewer/index.html` — ビューア本体（3D 表示・編集 UI）
 - `viewer/github.js` — ブラウザから GitHub API へ接続し、会社データを整形する層（接続情報は localStorage）
 - `viewer/vendor/` — three.js（同梱。CDN には依存しない）
+- `start-viewer.bat` / `start-viewer.command` / `start-viewer.sh` — ダブルクリック起動用のランチャー。Windows 版は `tools/static-server.ps1`（Windows 標準機能だけの最小静的サーバー）を使う
 - `server/` — 従来方式のローカルサーバー（任意）。トークンをブラウザに入れたくない場合や、常駐表示したい場合はこちらも使えます。使い方は `server/server.mjs` 冒頭と `docker-compose.yml` を参照
 
 ## 開発者向け
