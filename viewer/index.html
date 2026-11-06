@@ -2276,8 +2276,9 @@ async function refreshData() {
   }
 }
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
-// ===== 自動更新（30秒ごと。変更があったときだけ静かに再描画する） =====
+// ===== 自動更新（ETag で見張り、変更があったときだけ全取得して再描画する） =====
 let autoRefreshing = false;
+let lastFullRefreshAt = 0;
 async function autoRefreshTick() {
   if (autoRefreshing || document.hidden) return;
   const cfg = window.TCGitHub && TCGitHub.getConfig();
@@ -2287,6 +2288,7 @@ async function autoRefreshTick() {
   if (settingsEl.classList.contains('open')) return;
   if (connectOverlay.classList.contains('open')) return;
   autoRefreshing = true;
+  lastFullRefreshAt = Date.now();
   try {
     const data = await TCGitHub.loadCompany(cfg);
     stampUpdated();
@@ -2314,9 +2316,33 @@ async function autoRefreshTick() {
   finally { autoRefreshing = false; }
 }
 window.autoRefreshTick = autoRefreshTick;
-setInterval(autoRefreshTick, 30000);
-// タブに戻った瞬間にも1回更新する（裏にいる間のタイマー間引き対策）
-document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefreshTick(); });
+// 7秒ごとに「変わったか」だけを ETag で確認する（変更なしの応答は回数制限に数えられない）。
+// 変更を検知したら全取得するが、全取得どうしの間隔は最低10秒あける。
+// 120秒ごとの全取得は、見張りで拾えない変化のための安全網。
+let probePending = false;
+let probing = false;
+async function probeTick() {
+  if (probing || document.hidden) return;
+  const cfg = window.TCGitHub && TCGitHub.getConfig();
+  if (!cfg || !TCGitHub.probeChanges) return;
+  if (editMode) return;
+  if (settingsEl.classList.contains('open')) return;
+  if (connectOverlay.classList.contains('open')) return;
+  probing = true;
+  try {
+    if (await TCGitHub.probeChanges(cfg)) probePending = true;
+  } catch (e) { /* 見張りの失敗は静かに無視する（安全網の全取得に任せる） */ }
+  finally { probing = false; }
+  if (probePending && Date.now() - lastFullRefreshAt >= 10000) {
+    probePending = false;
+    autoRefreshTick();
+  }
+}
+window.probeTick = probeTick;
+setInterval(probeTick, 7000);
+setInterval(autoRefreshTick, 120000);
+// タブに戻った瞬間にも見張りを1回かける（裏にいる間のタイマー間引き対策）
+document.addEventListener('visibilitychange', () => { if (!document.hidden) probeTick(); });
 // ===== 接続パネル =====
 const connectOverlay = document.getElementById('connectOverlay');
 const connInfoEl = document.getElementById('connInfo');
