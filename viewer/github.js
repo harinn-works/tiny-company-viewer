@@ -218,7 +218,7 @@
         assignee: f['担当'] || null,
         chat,
         out: f['成果物'] || null,
-        ask: f['承認待ちの内容'] && f['承認待ちの内容'] !== 'なし' ? f['承認待ちの内容'] : null,
+        ask: f['承認待ちの内容'] && !/^なし([。、（(]|$)/.test(f['承認待ちの内容']) ? f['承認待ちの内容'] : null,
         reportTo,
         reportText: f['報告文'] || null,
         preCheck: preChecks[i],
