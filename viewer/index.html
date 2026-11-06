@@ -789,7 +789,7 @@ function person(parent, x, z, rotY, issue) {
     armR.rotation.x = 2.7;
     armL.rotation.x = 0.85;
   } else if (info.status === 'working') {
-    armL.rotation.x = 1.35; armR.rotation.x = 1.35;
+    armL.rotation.x = 1.9; armR.rotation.x = 1.9;
   } else if (info.status === 'not_started') {
     armL.rotation.x = 0.12; armR.rotation.x = 0.12;
   } else {
@@ -2188,8 +2188,8 @@ const t = clockT.getElapsedTime();
 for (const a of animated) {
 if (deadRoots.has(a.root)) continue;
 if (a.kind === 'working') {
-a.armL.rotation.x = 1.35 + Math.sin(t * 11 + a.phase) * 0.1;
-a.armR.rotation.x = 1.35 + Math.sin(t * 11 + a.phase + Math.PI) * 0.1;
+a.armL.rotation.x = 1.9 + Math.sin(t * 11 + a.phase) * 0.1;
+a.armR.rotation.x = 1.9 + Math.sin(t * 11 + a.phase + Math.PI) * 0.1;
 a.headG.position.y = 0.92 + Math.abs(Math.sin(t * 5.5 + a.phase)) * 0.012;
 } else if (a.kind === 'waiting_approval') {
 a.armR.rotation.z = Math.sin(t * 3 + a.phase) * 0.18;
