@@ -21,7 +21,7 @@ function send(res, code, obj) {
     'Content-Type': 'application/json',
     // ブラウザ完結ビューアから直接叩くテストのために CORS を許可する（テスト専用）
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-GitHub-Api-Version',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-GitHub-Api-Version, If-None-Match',
     'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
   });
   res.end(body);
