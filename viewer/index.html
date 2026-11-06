@@ -2242,17 +2242,19 @@ async function autoRefreshTick() {
   if (autoRefreshing || document.hidden) return;
   const cfg = window.TCGitHub && TCGitHub.getConfig();
   if (!cfg) return;
-  // 編集中・設定・接続・詳細を開いている間は邪魔しない
+  // 編集中・設定・接続の間は邪魔しない。詳細パネルは開いたままでも更新し、中身も最新に差し替える
   if (editMode) return;
   if (settingsEl.classList.contains('open')) return;
   if (connectOverlay.classList.contains('open')) return;
-  if (detail.classList.contains('open')) return;
   autoRefreshing = true;
   try {
     const data = await TCGitHub.loadCompany(cfg);
     stampUpdated();
     if (JSON.stringify(data) === lastDataJson) return;
     lastDataJson = JSON.stringify(data);
+    const openNum = detail.classList.contains('open')
+      ? parseInt((document.getElementById('dIssueNum').textContent || '').replace('#', ''), 10) || null
+      : null;
     SETTINGS = convertSettings(data.settings || {});
     BUILDING = data.building || BUILDING;
     LAYOUTS = data.layouts || {};
@@ -2263,11 +2265,18 @@ async function autoRefreshTick() {
     normalizeLayouts();
     buildTabs();
     switchView(currentViewKey);
+    if (openNum) {
+      const iss = ISSUES.find(i => i.number === openNum);
+      if (iss) showDetail(infoOf(iss), { x: 0, z: 0 });
+      else closeDetail();
+    }
   } catch (e) { /* 自動更新の失敗は静かに無視する（手動の再取得で確認できる） */ }
   finally { autoRefreshing = false; }
 }
 window.autoRefreshTick = autoRefreshTick;
 setInterval(autoRefreshTick, 30000);
+// タブに戻った瞬間にも1回更新する（裏にいる間のタイマー間引き対策）
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefreshTick(); });
 // ===== 接続パネル =====
 const connectOverlay = document.getElementById('connectOverlay');
 const connInfoEl = document.getElementById('connInfo');
