@@ -17,11 +17,18 @@ const issueByNum = n => issues.find(i => i.number === Number(n));
 
 function send(res, code, obj) {
   const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.writeHead(code, {
+    'Content-Type': 'application/json',
+    // ブラウザ完結ビューアから直接叩くテストのために CORS を許可する（テスト専用）
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-GitHub-Api-Version',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
+  });
   res.end(body);
 }
 
 const server = http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') return send(res, 204, '');
   const url = new URL(req.url, 'http://stub');
   const p = decodeURIComponent(url.pathname);
   let m;
