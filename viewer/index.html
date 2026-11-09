@@ -144,6 +144,10 @@
     overflow:hidden; flex-direction:column;
   }
   #boardBar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; margin-left:336px; transition:margin-left .28s ease; }
+  #boardChips { display:contents; }
+  #boardSearch { border:1px solid #d8ded8; border-radius:999px; padding:7px 14px; font-size:13px; width:220px; background:#fff; color:#273A34; }
+  #boardSearch:focus { outline:2px solid #356A59; outline-offset:1px; }
+  .moreBtn { margin-top:8px; width:100%; border:1.5px dashed #c3ccc3; background:none; border-radius:8px; padding:8px 0; cursor:pointer; color:#356A59; font-size:12.5px; font-weight:600; }
   body.panel-mini #boardBar, body.panel-mini #boardScroll { margin-left:0; }
   #boardBar .chip {
     border:none; cursor:pointer; font-size:13px; font-weight:600;
@@ -274,7 +278,7 @@
   </div>
 </div>
 <div id="board">
-  <div id="boardBar"></div>
+  <div id="boardBar"><span id="boardChips"></span><input id="boardSearch" type="search" placeholder="タイトル・担当・#番号で検索" autocomplete="off"></div>
   <div id="boardScroll"><div id="lanes"></div></div>
 </div>
 <div class="hint" id="hint">ドラッグで回転 / 右ドラッグ・WASDで移動 / Homeで中央に戻る / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ</div>
@@ -2386,9 +2390,18 @@ function roomNameOf(iss) {
 }
 let boardFilter = 'all';
 let boardGroup = 'status';
+let boardQuery = '';
+let boardDoneLimit = 30;
+const DONE_PAGE = 30;
 const boardEl = document.getElementById('board');
 const lanesEl = document.getElementById('lanes');
-const boardBarEl = document.getElementById('boardBar');
+const boardBarEl = document.getElementById('boardChips');
+const boardSearchEl = document.getElementById('boardSearch');
+boardSearchEl.addEventListener('input', () => {
+  boardQuery = boardSearchEl.value.trim().toLowerCase();
+  boardDoneLimit = DONE_PAGE;
+  renderBoard();
+});
 function stickyCard(iss) {
   const card = document.createElement('div');
   card.className = 'sticky';
@@ -2417,7 +2430,7 @@ function renderBoardBar() {
     const b = document.createElement('button');
     b.className = 'chip' + (boardFilter === key ? ' on' : '');
     b.textContent = label;
-    b.addEventListener('click', () => { boardFilter = key; renderBoard(); });
+    b.addEventListener('click', () => { boardFilter = key; boardDoneLimit = DONE_PAGE; renderBoard(); });
     boardBarEl.appendChild(b);
   };
   mk('すべて', 'all');
@@ -2431,6 +2444,7 @@ function renderBoardBar() {
   g.textContent = boardGroup === 'status' ? '並び：状態別' : '並び：プロジェクト別';
   g.addEventListener('click', () => {
     boardGroup = boardGroup === 'status' ? 'project' : 'status';
+    boardDoneLimit = DONE_PAGE;
     renderBoard();
   });
   boardBarEl.appendChild(g);
@@ -2449,18 +2463,41 @@ function moveIssueToLane(num, laneKey) {
   else { iss.state = 'open'; iss.status = laneKey; }
   renderBoard();
 }
+function moreButton(rest) {
+  const b = document.createElement('button');
+  b.className = 'moreBtn';
+  b.textContent = `あと${rest}件を表示`;
+  b.addEventListener('click', () => { boardDoneLimit += DONE_PAGE; renderBoard(); });
+  return b;
+}
 function renderBoard() {
   renderBoardBar();
   lanesEl.innerHTML = '';
-  const list = boardIssues();
+  let list = boardIssues();
+  if (boardQuery) {
+    list = list.filter(i =>
+      (i.title || '').toLowerCase().includes(boardQuery) ||
+      (i.assignee || '').toLowerCase().includes(boardQuery) ||
+      String(i.number).includes(boardQuery) ||
+      ('#' + i.number).includes(boardQuery));
+  }
+  const searching = boardQuery.length > 0;
   if (boardGroup === 'status') {
     lanesEl.style.flexDirection = 'row';
     for (const lane of LANES) {
-      const items = list.filter(i => laneOf(i) === lane.key);
+      let items = list.filter(i => laneOf(i) === lane.key);
+      if (searching && items.length === 0) continue;
+      let rest = 0;
+      if (lane.key === 'done') {
+        items = [...items].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+        if (!searching && items.length > boardDoneLimit) { rest = items.length - boardDoneLimit; items = items.slice(0, boardDoneLimit); }
+      }
+      const total = list.filter(i => laneOf(i) === lane.key).length;
       const el = document.createElement('div');
       el.className = 'lane';
-      el.innerHTML = `<h3><span class="dot" style="background:${lane.color}"></span>${lane.title} <span class="cnt">${items.length}</span></h3>`;
+      el.innerHTML = `<h3><span class="dot" style="background:${lane.color}"></span>${lane.title} <span class="cnt">${total}</span></h3>`;
       items.forEach(i => el.appendChild(stickyCard(i)));
+      if (rest > 0) el.appendChild(moreButton(rest));
       el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
       el.addEventListener('dragleave', () => el.classList.remove('over'));
       el.addEventListener('drop', e => {
@@ -2481,13 +2518,20 @@ function renderBoard() {
     const order = { not_started: 0, working: 1, waiting_approval: 2, waiting_review: 3, done: 4 };
     for (const [key, items] of groups) {
       items.sort((a, b) => order[laneOf(a)] - order[laneOf(b)] || a.number - b.number);
+      // 完了分は更新の新しい順に並べ替え、上限を超えた分は「もっと見る」に回す（検索中は上限なし）
+      const headItems = items.filter(i => laneOf(i) !== 'done');
+      let doneItems = items.filter(i => laneOf(i) === 'done')
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+      let rest = 0;
+      if (!searching && doneItems.length > boardDoneLimit) { rest = doneItems.length - boardDoneLimit; doneItems = doneItems.slice(0, boardDoneLimit); }
+      const visible = [...headItems, ...doneItems];
       const g = document.createElement('div');
       g.className = 'projGroup';
       const name = key === 'director' ? '社長室' : (BUILDING.rooms.find(r => r.id === key)?.name || key);
       g.innerHTML = `<h3>${name} <span style="color:#7d8a8a">${items.length}件</span></h3>`;
       const cards = document.createElement('div');
       cards.className = 'cards';
-      items.forEach(i => {
+      visible.forEach(i => {
         const c = stickyCard(i);
         const lane = LANES.find(l => l.key === laneOf(i)) || { color: '#9AA5A0', title: '状態なし' };
         const chip = document.createElement('div');
@@ -2497,6 +2541,7 @@ function renderBoard() {
         cards.appendChild(c);
       });
       g.appendChild(cards);
+      if (rest > 0) g.appendChild(moreButton(rest));
       lanesEl.appendChild(g);
     }
   }
