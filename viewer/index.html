@@ -75,8 +75,8 @@
     position:absolute; top:8px; right:12px; border:none; background:none;
     font-size:16px; color:#7d8a8a; cursor:pointer;
   }
+  #hdrBtns { position:fixed; right:12px; top:12px; z-index:6; display:flex; gap:8px; }
   #settingsToggle {
-    position:fixed; right:186px; top:12px; z-index:6;
     border:none; cursor:pointer; font-size:14px; font-weight:600;
     padding:9px 16px; border-radius:999px; color:#273A34;
     background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
@@ -115,7 +115,6 @@
   }
   #settings .note { font-size:11px; color:#7d8a8a; line-height:1.6; margin-top:10px; }
   #editToggle {
-    position:fixed; right:12px; top:12px; z-index:6;
     border:none; cursor:pointer; font-size:14px; font-weight:600;
     padding:9px 16px; border-radius:999px; color:#273A34;
     background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
@@ -279,8 +278,7 @@
   <div id="boardScroll"><div id="lanes"></div></div>
 </div>
 <div class="hint" id="hint">ドラッグで回転 / 右ドラッグ・WASDで移動 / Homeで中央に戻る / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ</div>
-<button id="settingsToggle">⚙️ 設定</button>
-<button id="editToggle">✏️ 編集モード</button>
+<div id="hdrBtns"><button id="settingsToggle">⚙️ 設定</button><button id="editToggle">✏️ 編集</button></div>
 <div id="editbar"></div>
 <div id="plateTip" style="display:none"></div>
 <div id="detail">
@@ -1960,7 +1958,7 @@ function setEditMode(on) {
 if (on && !editMode) editBaseline = snapshotEditState();
 editMode = on;
 editToggle.classList.toggle('on', on);
-editToggle.textContent = on? '✏️ 編集中（終了）': '✏️ 編集モード';
+editToggle.textContent = on? '✏️ 編集中（終了）': '✏️ 編集';
 editbar.style.display = on? 'block': 'none';
 controls.enabled =!on;
 for (const g of deptEditables) g.userData.handle.visible = on && isRoomView();
@@ -1970,7 +1968,7 @@ renderEditbar();
 editToggle.addEventListener('click', async () => {
 if (!editMode && currentViewKey!== 'all' &&!isRoomView()) {
 editToggle.textContent = '全体か部屋タブで編集できます';
-setTimeout(() => { if (!editMode) editToggle.textContent = '✏️ 編集モード';}, 1600);
+setTimeout(() => { if (!editMode) editToggle.textContent = '✏️ 編集';}, 1600);
 return;
 }
 const entering = !editMode;
