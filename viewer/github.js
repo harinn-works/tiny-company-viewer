@@ -189,6 +189,7 @@
           return rl ? rl.slice(roomPrefix.length) : null;
         })(),
         roles: labelNames.filter(n => n.startsWith(rolePrefix)).map(n => n.slice(rolePrefix.length)),
+        hidden: labelNames.includes('非表示'),
       };
     });
 
@@ -212,6 +213,7 @@
         updatedAt: p.iss.updated_at || null,
         seat: p.seat,
         status: p.status,
+        hidden: p.hidden,
         room: p.room,
         roles: p.roles,
         parent: p.parent,
@@ -262,6 +264,22 @@
     return issuesChanged || headChanged;
   }
 
+  // 「非表示」ラベルの付け外し（キャラの表示・非表示の切り替え）
+  async function setIssueHidden(cfg, number, hidden) {
+    if (hidden) {
+      const r = await gh(cfg, `/repos/${cfg.repo}/issues/${number}/labels`, {
+        method: 'POST', body: JSON.stringify({ labels: ['非表示'] }),
+      });
+      if (!r.ok) throw new Error(`add label -> ${r.status}`);
+    } else {
+      const r = await gh(cfg, `/repos/${cfg.repo}/issues/${number}/labels/${encodeURIComponent('非表示')}`, {
+        method: 'DELETE',
+      });
+      if (!r.ok && r.status !== 404) throw new Error(`remove label -> ${r.status}`);
+    }
+    return true;
+  }
+
   // ---------- 保存（server.mjs の POST /api/files と同じ制限） ----------
   const WRITE_OK = /^board\/(settings|building)\.json$|^rooms\/[A-Za-z0-9._-]+\/layout\.json$/;
   async function saveFile(cfg, filePath, content) {
@@ -285,5 +303,5 @@
     return true;
   }
 
-  window.TCGitHub = { getConfig, saveConfig, clearConfig, loadCompany, saveFile, validate, probeChanges };
+  window.TCGitHub = { getConfig, saveConfig, clearConfig, loadCompany, saveFile, validate, probeChanges, setIssueHidden };
 })();
