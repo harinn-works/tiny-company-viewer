@@ -787,23 +787,14 @@ function plateSpriteFrom(lines, gold) {
   sp.userData.worldW = worldW;
   return sp;
 }
-// 名札一式：2行（full）と1行短縮（short）。投影幅で出し分ける（none は両方隠す）
+// 名札：タイトルを最大2行で常に表示する（ズームによる出し分けはしない）
 function makePlates(text, gold = false) {
   const mctx = document.createElement('canvas').getContext('2d');
   const lines = splitTitleLines(text, mctx, 1000);
   const grp = new THREE.Group();
   const full = plateSpriteFrom(lines, gold);
-  let shortLines = lines;
-  if (lines.length > 1) {
-    let t = lines[0];
-    mctx.font = PLATE_FONT;
-    while (t.length > 1 && mctx.measureText(t + '…').width > 620) t = t.slice(0, -1);
-    shortLines = [t + '…'];
-  }
-  const short = plateSpriteFrom(shortLines, gold);
-  short.visible = false;
-  grp.add(full, short);
-  grp.userData.plates = { full, short, tier: 'full', fullW: full.userData.worldW };
+  grp.add(full);
+  grp.userData.plates = { full, fullW: full.userData.worldW };
   return grp;
 }
 const textMeasureCtx = document.createElement('canvas').getContext('2d');
@@ -2534,30 +2525,7 @@ document.getElementById('boardScroll').addEventListener('click', e => {
   if (!e.target.closest('.sticky')) closeDetail();
 });
 
-// 名札の出し分け：画面投影幅で 2行／1行短縮／非表示 を切り替える（±10px のヒステリシス）
-let plateTick = 0;
-const _pv = new THREE.Vector3();
-function updatePlateTiers() {
-  const hPx = renderer.domElement.clientHeight || innerHeight;
-  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  for (const a of animated) {
-    const pl = a.root.userData.plates;
-    if (!pl || deadRoots.has(a.root)) continue;
-    a.root.getWorldPosition(_pv);
-    const dist = camera.position.distanceTo(_pv);
-    if (!dist) continue;
-    const wPx = (pl.fullW || 1.7) / (2 * dist * tanH) * hPx;
-    let want = pl.tier;
-    if (pl.tier === 'full') { if (wPx < 160) want = 'short'; }
-    else if (pl.tier === 'short') { if (wPx > 180) want = 'full'; else if (wPx < 70) want = 'none'; }
-    else if (wPx > 90) want = 'short';
-    if (want !== pl.tier) {
-      pl.tier = want;
-      pl.full.visible = want === 'full';
-      pl.short.visible = want === 'short';
-    }
-  }
-}
+// 名札はズームによらず常に全文（最大2行）表示にする（2026-11-09 本人決定。出し分けはしない）
 
 // ===== アニメーション =====
 const clockT = new THREE.Clock();
@@ -2582,7 +2550,6 @@ a.headG.position.y = 0.92 + Math.sin(t * 1.6 + a.phase) * 0.008;
 moveCamByKeys();
 controls.update();
 renderer.render(scene, camera);
-if (++plateTick % 12 === 0) updatePlateTiers();
 }
 renderer.setAnimationLoop(tick);
 
