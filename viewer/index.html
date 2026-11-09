@@ -53,6 +53,11 @@
   #detail .linkRow a { color:#356A59; text-decoration:underline; font-size:13px; font-weight:600; }
   #detail .mgmtRow { margin-top:16px; border-top:1px solid #E3E9E4; padding-top:10px; }
   #detail .mgmtRow a { color:#7d8a8a; font-size:12.5px; text-decoration:underline; }
+  #plateTip { position:fixed; z-index:60; max-width:320px; background:#ffffff; border:1px solid #E3E9E4; border-radius:8px; padding:6px 10px; font-size:14px; line-height:1.5; color:#273A34; box-shadow:0 4px 16px rgba(39,58,52,0.14); pointer-events:none; }
+  #detail .pcItem { display:flex; gap:8px; margin-top:4px; }
+  #detail .pcLbl { flex:0 0 34px; font-size:11.5px; font-weight:700; color:#7d8a8a; padding-top:2px; }
+  #detail .pcTxt.clamp { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  #detail .pcMore { margin-top:6px; background:none; border:none; color:#356A59; font-size:12.5px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline; }
   #detail .taskRow { display:flex; align-items:center; gap:6px; padding:2px 0; cursor:pointer; }
   #detail .taskRow:hover { text-decoration:underline; }
   #detail .taskRow.cur { font-weight:700; cursor:default; text-decoration:none; }
@@ -276,6 +281,7 @@
 <button id="settingsToggle">⚙️ 設定</button>
 <button id="editToggle">✏️ 編集モード</button>
 <div id="editbar"></div>
+<div id="plateTip" style="display:none"></div>
 <div id="detail">
   <button class="close" id="detailClose">✕</button>
   <div class="ttl" id="dTitle"></div>
@@ -288,7 +294,7 @@
   <div class="row" id="dTasksRow" style="display:none"><b>この人のタスク</b><span id="dTasks"></span></div>
   <div class="row"><b>成果物</b><span id="dOut"></span></div>
   <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
-  <div class="checkLine" id="dCheckSec" style="display:none"><div class="secT" id="dCheckT">一次確認</div><div id="dCheckRec"></div></div>
+  <div class="checkLine" id="dCheckSec" style="display:none"><div class="secT" id="dCheckT">一次確認</div><div class="pcItem"><span class="pcLbl">推奨</span><div class="pcTxt clamp" id="dCheckRec"></div></div><div class="pcItem" id="dCheckConRow" style="display:none"><span class="pcLbl">懸念</span><div class="pcTxt clamp" id="dCheckCon"></div></div><button class="pcMore" id="dCheckMore" style="display:none">全文を表示</button></div>
   <div class="btnMain" id="dMainRow" style="display:none">
     <a href="#" id="dParentChat">報告先のチャットを開く</a>
   </div>
@@ -566,7 +572,9 @@ function ensureLayout(roomId) {
 // layout が無い部屋は ensureLayout が部署「メイン」を合成し、ここで4席の島を必要数だけ足す（契約4）。
 function prepareLayout(roomId) {
   const L = ensureLayout(roomId);
-  const members = unitsOf(roomId).filter(u => !u.mgmt && u.rep.seat === 'member');
+  const pbU = primaryBuchoUnit(roomId);
+  const pbUNum = pbU ? pbU.rep.number : null;
+  const members = unitsOf(roomId).filter(u => u.rep.number !== pbUNum && (u.rep.seat === 'member' || (u.mgmt && u.mgmt.bucho)));
   if (members.length) {
     ensureDepartment(L);
     const seatCount = () => L.islands.reduce((s, isl) => s + (isl.memberSeats || []).length, 0);
@@ -617,8 +625,10 @@ function resolveRoom(layout, roomId) {
     isl.memberSeats.forEach((s, idx) => seats.push(mkSeat(isl, 'member', idx, s.issue)));
   }
   const placed = new Set(seats.filter(s => s.issue).map(s => s.issue.number));
+  const pb = primaryBuchoUnit(roomId);
+  const pbRep = pb ? pb.rep.number : null;
   const rest = units
-    .filter(u => !u.mgmt && u.rep.seat === 'member' && !placed.has(u.rep.number))
+    .filter(u => u.rep.number !== pbRep && !placed.has(u.rep.number) && (u.rep.seat === 'member' || (u.mgmt && u.mgmt.bucho)))
     .sort((a, b) => rootBuchoNum(a.rep) - rootBuchoNum(b.rep) || issueDepth(a.rep) - issueDepth(b.rep) || a.rep.number - b.rep.number);
   for (const u of rest) {
     const seat = seats.find(s => !s.issue && s.kind === 'member');
@@ -667,28 +677,72 @@ function rbox(w, h, d, color, x, y, z, r = 0.04, parent = scene) {
   parent.add(m);
   return m;
 }
-function plateSprite(text, gold = false) {
-  const cv = document.createElement('canvas'); cv.width = 880; cv.height = 168;
+// 名札の表示タイトル：フォントは縮めず、意味の区切りで最大2行に折る（#19 デザイン）
+function splitTitleLines(text, ctx, maxW) {
+  const t = text == null ? '' : String(text);
+  ctx.font = '700 58px system-ui, sans-serif';
+  if (ctx.measureText(t).width <= maxW) return [t];
+  const breaks = [];
+  for (let i = 2; i < t.length - 1; i++) {
+    if ('、。（）()・：:／/ 　はがをにのではへともや'.includes(t[i - 1])) breaks.push(i);
+  }
+  const total = ctx.measureText(t).width;
+  let best = -1, bestScore = Infinity;
+  for (const b of breaks) {
+    const w1 = ctx.measureText(t.slice(0, b)).width;
+    const score = Math.abs(w1 - total / 2);
+    if (w1 <= maxW && score < bestScore) { bestScore = score; best = b; }
+  }
+  let l1, l2;
+  if (best > 0) { l1 = t.slice(0, best); l2 = t.slice(best); }
+  else {
+    let n = t.length;
+    while (n > 1 && ctx.measureText(t.slice(0, n)).width > maxW) n--;
+    l1 = t.slice(0, n); l2 = t.slice(n);
+  }
+  if (ctx.measureText(l2).width > maxW) {
+    let n = l2.length;
+    while (n > 1 && ctx.measureText(l2.slice(0, n) + '…').width > maxW) n--;
+    l2 = l2.slice(0, n) + '…';
+  }
+  return [l1, l2];
+}
+function plateSpriteFrom(lines, gold) {
+  const h = lines.length === 1 ? 168 : 250;
+  const cv = document.createElement('canvas'); cv.width = 880; cv.height = h;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = gold ? 'rgba(255,246,220,0.97)' : 'rgba(255,255,255,0.96)';
-  ctx.beginPath(); ctx.roundRect(8, 10, 864, 148, 44); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(8, 10, 864, h - 20, 44); ctx.fill();
   if (gold) { ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 10; ctx.stroke(); }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#26322f';
-  let t = text == null ? '' : String(text);
-  let fs = 62;
-  ctx.font = `700 ${fs}px system-ui, sans-serif`;
-  while (ctx.measureText(t).width > 800 && fs > 34) { fs -= 4; ctx.font = `700 ${fs}px system-ui, sans-serif`; }
-  if (ctx.measureText(t).width > 800) {
-    while (t.length && ctx.measureText(t + '…').width > 800) t = t.slice(0, -1);
-    t += '…';
-  }
-  ctx.fillText(t, 440, 86);
+  ctx.font = '700 58px system-ui, sans-serif';
+  if (lines.length === 1) ctx.fillText(lines[0], 440, h / 2 + 1);
+  else { ctx.fillText(lines[0], 440, 82); ctx.fillText(lines[1], 440, 168); }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sp.scale.set(1.7, 0.325, 1);
+  sp.scale.set(1.7, 1.7 * h / 880, 1);
   return sp;
+}
+// 名札一式：2行（full）と1行短縮（short）。投影幅で出し分ける（none は両方隠す）
+function makePlates(text, gold = false) {
+  const mctx = document.createElement('canvas').getContext('2d');
+  const lines = splitTitleLines(text, mctx, 790);
+  const grp = new THREE.Group();
+  const full = plateSpriteFrom(lines, gold);
+  let shortLines = lines;
+  if (lines.length > 1) {
+    let t = lines[0];
+    mctx.font = '700 58px system-ui, sans-serif';
+    while (t.length > 1 && mctx.measureText(t + '…').width > 480) t = t.slice(0, -1);
+    shortLines = [t + '…'];
+  }
+  const short = plateSpriteFrom(shortLines, gold);
+  short.visible = false;
+  grp.add(full, short);
+  grp.userData.plates = { full, short, tier: 'full' };
+  return grp;
 }
 function textSprite(text, scale = 1) {
   const cv = document.createElement('canvas'); cv.width = 768; cv.height = 192;
@@ -803,6 +857,14 @@ function unitOf(issue) {
   const us = unitsOf(issue.room || null);
   return us.find(u => u.issues.some(i => i.number === issue.number)) || { issues: [issue], rep: issue, mgmt: null };
 }
+// 部長席に座るのは1人だけ：開いている部長を優先し、同格なら番号の小さい方を主部長とする
+function primaryBuchoUnit(roomId) {
+  const cands = unitsOf(roomId).filter(u => u.mgmt && u.mgmt.bucho);
+  if (!cands.length) return null;
+  return cands.sort((a, b) =>
+    (a.mgmt.state === 'open' ? 0 : 1) - (b.mgmt.state === 'open' ? 0 : 1) ||
+    a.mgmt.number - b.mgmt.number)[0];
+}
 function infoOf(issue) {
   const seatDef = SETTINGS.seats && SETTINGS.seats[issue.seat];
   const info = {
@@ -846,9 +908,10 @@ function person(parent, x, z, rotY, issue, tierIssue) {
     headG.add(cap, brim);
   }
   g.add(headG);
-  const plate = plateSprite(info.title, info.role === 'director');
-  plate.position.set(0, 1.52, 0);
+  const plate = makePlates(info.title, info.role === 'director');
+  plate.position.set(0, 1.66, 0);
   g.add(plate);
+  g.userData.plates = plate.userData.plates;
   const poseStatus = closedFig ? null : info.status;
   let bang = null;
   if (poseStatus === 'waiting_approval') {
@@ -975,8 +1038,8 @@ function buildRoomContents(parent, effLayout, roomId, furniture = true) {
   for (const isl of effLayout.islands) {
     buildIsland(parent, isl, seats.filter(s => s.isl === isl));
   }
-  const buchoUnit = unitsOf(roomId).find(u => u.mgmt && u.mgmt.bucho);
-  if (buchoUnit && !seats.some(s => s.unit === buchoUnit)) {
+  const buchoUnit = primaryBuchoUnit(roomId);
+  if (buchoUnit && !seats.some(s => s.unit && s.unit.rep.number === buchoUnit.rep.number)) {
     const W = effLayout.size.w, D = effLayout.size.d;
     const rectDist = (a, b) => {
       const dx = Math.max(b.x0 - a.x1, a.x0 - b.x1, 0);
@@ -1424,9 +1487,25 @@ function showDetail(info, anchorWorld) {
     document.getElementById('dCheckT').textContent =
       '一次確認（' + (issue.preCheck.by || '上司') + '）';
     const recEl = document.getElementById('dCheckRec');
-    recEl.textContent = '推奨：' + issue.preCheck.recommend;
-    recEl.title = '推奨：' + issue.preCheck.recommend +
-      (issue.preCheck.concerns ? '\n懸念：' + issue.preCheck.concerns : '');
+    recEl.textContent = issue.preCheck.recommend || '';
+    recEl.classList.add('clamp');
+    const conRow = document.getElementById('dCheckConRow');
+    const conEl = document.getElementById('dCheckCon');
+    if (issue.preCheck.concerns) {
+      conRow.style.display = '';
+      conEl.textContent = issue.preCheck.concerns;
+      conEl.classList.add('clamp');
+    } else {
+      conRow.style.display = 'none';
+    }
+    const moreBtn = document.getElementById('dCheckMore');
+    moreBtn.style.display = 'none';
+    moreBtn.textContent = '全文を表示';
+    moreBtn.dataset.open = '';
+    requestAnimationFrame(() => {
+      const overflow = [recEl, conEl].some(el => el.offsetParent !== null && el.scrollHeight > el.clientHeight + 2);
+      moreBtn.style.display = overflow ? '' : 'none';
+    });
   } else {
     csec.style.display = 'none';
   }
@@ -1487,6 +1566,14 @@ updateChatUI(info);
 document.getElementById('detailClose').addEventListener('click', () => {
   closeDetail();
   ring.visible = false;
+});
+document.getElementById('dCheckMore').addEventListener('click', e => {
+  const btn = e.currentTarget;
+  const open = btn.dataset.open === '1';
+  document.getElementById('dCheckRec').classList.toggle('clamp', open);
+  document.getElementById('dCheckCon').classList.toggle('clamp', open);
+  btn.dataset.open = open ? '' : '1';
+  btn.textContent = open ? '全文を表示' : '折りたたむ';
 });
 
 // ===== 設定画面 =====
@@ -1657,6 +1744,35 @@ renderer.domElement.addEventListener('pointerup', e => {
   // 人物以外（空き場所）をクリックしたら詳細を閉じる
   closeDetail();
 });
+
+// 名札のホバー：タイトル全文をツールチップで出す
+const plateTip = document.getElementById('plateTip');
+let tipAt = 0;
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  const now = performance.now();
+  if (now - tipAt < 90) return;
+  tipAt = now;
+  if (downAt) { plateTip.style.display = 'none'; return; }
+  evPointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(clickables, true);
+  let info = null;
+  for (const h of hits) {
+    let o = h.object;
+    while (o && !o.userData.info) o = o.parent;
+    if (o) { info = o.userData.info; break; }
+  }
+  if (info && info.title) {
+    plateTip.textContent = info.title;
+    plateTip.style.display = '';
+    plateTip.style.left = Math.min(e.clientX + 14, innerWidth - 340) + 'px';
+    plateTip.style.top = (e.clientY + 16) + 'px';
+  } else {
+    plateTip.style.display = 'none';
+  }
+});
+renderer.domElement.addEventListener('pointerleave', () => { plateTip.style.display = 'none'; });
 
 renderer.domElement.addEventListener('dblclick', e => {
   if (editMode) return;
@@ -2346,6 +2462,31 @@ document.getElementById('boardScroll').addEventListener('click', e => {
   if (!e.target.closest('.sticky')) closeDetail();
 });
 
+// 名札の出し分け：画面投影幅で 2行／1行短縮／非表示 を切り替える（±10px のヒステリシス）
+let plateTick = 0;
+const _pv = new THREE.Vector3();
+function updatePlateTiers() {
+  const hPx = renderer.domElement.clientHeight || innerHeight;
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  for (const a of animated) {
+    const pl = a.root.userData.plates;
+    if (!pl || deadRoots.has(a.root)) continue;
+    a.root.getWorldPosition(_pv);
+    const dist = camera.position.distanceTo(_pv);
+    if (!dist) continue;
+    const wPx = 1.7 / (2 * dist * tanH) * hPx;
+    let want = pl.tier;
+    if (pl.tier === 'full') { if (wPx < 190) want = 'short'; }
+    else if (pl.tier === 'short') { if (wPx > 210) want = 'full'; else if (wPx < 110) want = 'none'; }
+    else if (wPx > 130) want = 'short';
+    if (want !== pl.tier) {
+      pl.tier = want;
+      pl.full.visible = want === 'full';
+      pl.short.visible = want === 'short';
+    }
+  }
+}
+
 // ===== アニメーション =====
 const clockT = new THREE.Clock();
 function tick() {
@@ -2368,6 +2509,7 @@ a.headG.position.y = 0.92 + Math.sin(t * 1.6 + a.phase) * 0.008;
 }
 controls.update();
 renderer.render(scene, camera);
+if (++plateTick % 12 === 0) updatePlateTiers();
 }
 renderer.setAnimationLoop(tick);
 
