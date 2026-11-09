@@ -277,7 +277,7 @@
   <div id="boardBar"></div>
   <div id="boardScroll"><div id="lanes"></div></div>
 </div>
-<div class="hint" id="hint">ドラッグで回転 / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ</div>
+<div class="hint" id="hint">ドラッグで回転 / 右ドラッグ・WASDで移動 / Homeで中央に戻る / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ</div>
 <button id="settingsToggle">⚙️ 設定</button>
 <button id="editToggle">✏️ 編集モード</button>
 <div id="editbar"></div>
@@ -660,6 +660,56 @@ document.getElementById('app').appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.49;
+// カメラ移動（Unity のシーンビュー寄せ）：左=回転 / 中・右ドラッグ=移動（パン）。パンは地面に沿って動く
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+controls.screenSpacePanning = false;
+// WASD・矢印キーでも視点を移動できる。F = 選択中の人にフォーカス
+const camKeys = new Set();
+addEventListener('keydown', e => {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const k = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+    camKeys.add(k);
+    if (k.startsWith('arrow')) e.preventDefault();
+  } else if (k === 'f') focusSelectedPerson();
+  else if (k === 'home') { e.preventDefault(); switchView(currentViewKey); } // 中央（そのビューの定位置）へ戻す
+});
+addEventListener('keyup', e => camKeys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => camKeys.clear());
+function moveCamByKeys() {
+  if (!camKeys.size) return;
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd); fwd.y = 0;
+  if (!fwd.lengthSq()) return;
+  fwd.normalize();
+  const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+  const mv = new THREE.Vector3();
+  if (camKeys.has('w') || camKeys.has('arrowup')) mv.add(fwd);
+  if (camKeys.has('s') || camKeys.has('arrowdown')) mv.sub(fwd);
+  if (camKeys.has('d') || camKeys.has('arrowright')) mv.add(right);
+  if (camKeys.has('a') || camKeys.has('arrowleft')) mv.sub(right);
+  if (!mv.lengthSq()) return;
+  const spd = Math.max(0.12, camera.position.distanceTo(controls.target) * 0.016);
+  mv.normalize().multiplyScalar(spd);
+  camera.position.add(mv);
+  controls.target.add(mv);
+}
+function focusSelectedPerson() {
+  if (!detailInfo) return;
+  const num = detailInfo.number;
+  const a = animated.find(x => {
+    const inf = x.root.userData.info;
+    return inf && (inf.number === num || (inf.tasks || []).some(t => t.number === num));
+  });
+  if (!a) return;
+  const p = new THREE.Vector3();
+  a.root.getWorldPosition(p); p.y = 0.9;
+  const off = camera.position.clone().sub(controls.target);
+  controls.target.copy(p);
+  camera.position.copy(p).add(off);
+  controls.update();
+}
 scene.add(new THREE.HemisphereLight(0xffffff, 0xcfd4cf, 0.95));
 const sun = new THREE.DirectionalLight(0xfff4e2, 1.4);
 sun.position.set(14, 20, 9);
@@ -710,56 +760,70 @@ function splitTitleLines(text, ctx, maxW) {
   }
   return [l1, l2];
 }
+const plateMeasureCtx = document.createElement('canvas').getContext('2d');
 function plateSpriteFrom(lines, gold) {
-  const h = lines.length === 1 ? 168 : 250;
-  const cv = document.createElement('canvas'); cv.width = 880; cv.height = h;
+  // 枠はテキスト量に合わせた可変幅。背景は少し透過させる
+  plateMeasureCtx.font = PLATE_FONT;
+  let contentW = 0;
+  for (const ln of lines) contentW = Math.max(contentW, plateMeasureCtx.measureText(ln).width);
+  const W = Math.round(Math.min(1160, Math.max(340, contentW + 120)));
+  const h = lines.length === 1 ? 176 : 308;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = h;
   const ctx = cv.getContext('2d');
-  ctx.fillStyle = gold ? 'rgba(255,246,220,0.97)' : 'rgba(255,255,255,0.96)';
-  ctx.beginPath(); ctx.roundRect(8, 10, 864, h - 20, 44); ctx.fill();
-  if (gold) { ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 10; ctx.stroke(); }
+  ctx.fillStyle = gold ? 'rgba(255,246,220,0.90)' : 'rgba(255,255,255,0.88)';
+  ctx.beginPath(); ctx.roundRect(8, 10, W - 16, h - 20, 44); ctx.fill();
+  ctx.strokeStyle = gold ? '#d9a441' : 'rgba(70,90,84,0.35)';
+  ctx.lineWidth = gold ? 10 : 6; ctx.stroke();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#26322f';
   ctx.font = PLATE_FONT;
-  if (lines.length === 1) ctx.fillText(lines[0], 440, h / 2 + 2);
-  else { ctx.fillText(lines[0], 440, 80); ctx.fillText(lines[1], 440, 172); }
+  if (lines.length === 1) ctx.fillText(lines[0], W / 2, h / 2 + 2);
+  else { ctx.fillText(lines[0], W / 2, 104); ctx.fillText(lines[1], W / 2, 206); }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sp.scale.set(1.7, 1.7 * h / 880, 1);
+  const worldW = W / 512;
+  sp.scale.set(worldW, worldW * h / W, 1);
+  sp.userData.worldW = worldW;
   return sp;
 }
 // 名札一式：2行（full）と1行短縮（short）。投影幅で出し分ける（none は両方隠す）
 function makePlates(text, gold = false) {
   const mctx = document.createElement('canvas').getContext('2d');
-  const lines = splitTitleLines(text, mctx, 790);
+  const lines = splitTitleLines(text, mctx, 1000);
   const grp = new THREE.Group();
   const full = plateSpriteFrom(lines, gold);
   let shortLines = lines;
   if (lines.length > 1) {
     let t = lines[0];
     mctx.font = PLATE_FONT;
-    while (t.length > 1 && mctx.measureText(t + '…').width > 480) t = t.slice(0, -1);
+    while (t.length > 1 && mctx.measureText(t + '…').width > 620) t = t.slice(0, -1);
     shortLines = [t + '…'];
   }
   const short = plateSpriteFrom(shortLines, gold);
   short.visible = false;
   grp.add(full, short);
-  grp.userData.plates = { full, short, tier: 'full' };
+  grp.userData.plates = { full, short, tier: 'full', fullW: full.userData.worldW };
   return grp;
 }
+const textMeasureCtx = document.createElement('canvas').getContext('2d');
 function textSprite(text, scale = 1) {
-  const cv = document.createElement('canvas'); cv.width = 768; cv.height = 192;
+  // 枠はテキスト量に合わせた可変幅（長い名前でもはみ出さない）。背景は少し透過
+  textMeasureCtx.font = `800 84px ${TEXT_FONT_STACK}`;
+  const tw = textMeasureCtx.measureText(text == null ? '' : String(text)).width;
+  const W = Math.round(Math.min(1500, Math.max(320, tw + 150)));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = 192;
   const ctx = cv.getContext('2d');
-  ctx.fillStyle = 'rgba(255,255,255,0.97)';
-  ctx.beginPath(); ctx.roundRect(32, 24, 704, 144, 40); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.beginPath(); ctx.roundRect(10, 24, W - 20, 144, 40); ctx.fill();
   ctx.strokeStyle = 'rgba(36,50,50,0.4)'; ctx.lineWidth = 8; ctx.stroke();
   ctx.fillStyle = '#243232';
   ctx.font = `800 84px ${TEXT_FONT_STACK}`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, 384, 100);
+  ctx.fillText(text, W / 2, 100);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sp.scale.set(1.5 * scale, 0.38 * scale, 1);
+  sp.scale.set(1.5 * scale * W / 768, 0.38 * scale, 1);
   return sp;
 }
 function bangSprite() {
@@ -1369,7 +1433,7 @@ function switchView(key) {
 }
 const tabsEl = document.getElementById('tabs');
 const hintEl = document.getElementById('hint');
-const HINT_DEFAULT = 'ドラッグで回転 / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ';
+const HINT_DEFAULT = 'ドラッグで回転 / 右ドラッグ・WASDで移動 / Homeで中央に戻る / ホイールでズーム / タップで詳細 / 全体では部屋をダブルクリックで開く／部屋では空き場所をダブルクリックで全体へ';
 function buildTabs() {
   tabsEl.innerHTML = '';
   const defs = [['all', '全体'], ['director', '社長室'], ...visibleRooms().map(r => [r.id, r.name])];
@@ -1401,9 +1465,11 @@ function syncAppRight() {
   fitRenderer();
 }
 function openDetail() { settingsEl.classList.remove('open'); detail.classList.add('open'); syncAppRight(); }
-function closeDetail() { detail.classList.remove('open'); syncAppRight(); }
+function closeDetail() { detail.classList.remove('open'); detailInfo = null; syncAppRight(); }
 let detailAnchor = { x: 0, z: 0 };
+let detailInfo = null; // 詳細表示中の Issue 情報（F キーのフォーカス用）
 function showDetail(info, anchorWorld) {
+  detailInfo = info;
   if (anchorWorld) detailAnchor = anchorWorld;
   document.getElementById('dTitle').textContent = info.title;
   const seatDef = info.role ? SETTINGS.seats[info.role] : null;
@@ -2480,7 +2546,7 @@ function updatePlateTiers() {
     a.root.getWorldPosition(_pv);
     const dist = camera.position.distanceTo(_pv);
     if (!dist) continue;
-    const wPx = 1.7 / (2 * dist * tanH) * hPx;
+    const wPx = (pl.fullW || 1.7) / (2 * dist * tanH) * hPx;
     let want = pl.tier;
     if (pl.tier === 'full') { if (wPx < 160) want = 'short'; }
     else if (pl.tier === 'short') { if (wPx > 180) want = 'full'; else if (wPx < 70) want = 'none'; }
@@ -2513,6 +2579,7 @@ a.bang.scale.set(s, s, 1);
 a.headG.position.y = 0.92 + Math.sin(t * 1.6 + a.phase) * 0.008;
 }
 }
+moveCamByKeys();
 controls.update();
 renderer.render(scene, camera);
 if (++plateTick % 12 === 0) updatePlateTiers();
