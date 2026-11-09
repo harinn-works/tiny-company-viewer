@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>エージェント作業ボード 試作ビューア v21（階層の追加・削除）</title>
 <style>
-  html, body { margin:0; height:100%; overflow:hidden; background:#eef0ee; font-family: system-ui, sans-serif; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#F4F6F3; font-family: system-ui, sans-serif; }
   #app { position:fixed; inset:0; transition:right .28s ease; }
   .panel {
     position:fixed; left:12px; top:12px; z-index:8; background:rgba(255,255,255,.9);
-    border-radius:12px; padding:10px 14px; font-size:13px; color:#3f4a4a;
+    border-radius:12px; padding:10px 14px; font-size:13px; color:#273A34;
     box-shadow:0 2px 10px rgba(0,0,0,.08); line-height:1.7; max-width:308px;
   }
   .panel b { font-size:14px; }
   .panelHead { display:flex; align-items:center; justify-content:space-between; gap:10px; }
   #panelToggle {
-    border:none; cursor:pointer; background:#eef3f0; color:#3f4a4a; flex:none;
+    border:none; cursor:pointer; background:#eef3f0; color:#273A34; flex:none;
     border-radius:8px; width:26px; height:26px; font-size:14px; font-weight:700; line-height:1;
   }
   .panel.mini .panelBody { display:none; }
@@ -30,38 +30,38 @@
   }
   #tabs button {
     border:none; cursor:pointer; font-size:14px; font-weight:600;
-    padding:9px 18px; border-radius:999px; color:#3f4a4a;
+    padding:9px 18px; border-radius:999px; color:#273A34;
     background:rgba(255,255,255,.85); box-shadow:0 2px 8px rgba(0,0,0,.08);
   }
-  #tabs button.on { background:#3f4a4a; color:#fff; }
+  #tabs button.on { background:#356A59; color:#fff; }
 
   #detail {
     position:fixed; top:0; right:0; bottom:0; width:352px; max-width:92vw;
     background:rgba(255,255,255,.97); border-radius:0; padding:20px 20px 16px;
-    box-shadow:-8px 0 28px rgba(0,0,0,.16); color:#3f4a4a; font-size:13.5px; line-height:1.8;
+    box-shadow:-8px 0 28px rgba(0,0,0,.16); color:#273A34; font-size:14px; line-height:1.8;
     z-index:9; transform:translateX(105%); transition:transform .28s ease; overflow-y:auto;
   }
   #detail.open { transform:none; }
-  #detail .ttl { font-size:15px; font-weight:700; line-height:1.45; }
+  #detail .ttl { font-size:17px; font-weight:700; line-height:1.45; }
   #detail .row b { display:inline-block; width:58px; color:#7d8a8a; font-weight:600; font-size:12px; }
   #detail .btnMain { margin-top:14px; }
   #detail .btnMain a {
     display:block; text-align:center; text-decoration:none; font-weight:700;
-    background:#1D76DB; color:#fff; border-radius:8px; padding:10px 0;
+    background:#356A59; color:#fff; border-radius:8px; padding:10px 0;
   }
   #detail .linkRow { margin-top:12px; display:flex; gap:18px; }
-  #detail .linkRow a { color:#1d76db; text-decoration:underline; font-size:13px; font-weight:600; }
-  #detail .mgmtRow { margin-top:16px; border-top:1px solid #e3e8e3; padding-top:10px; }
+  #detail .linkRow a { color:#356A59; text-decoration:underline; font-size:13px; font-weight:600; }
+  #detail .mgmtRow { margin-top:16px; border-top:1px solid #E3E9E4; padding-top:10px; }
   #detail .mgmtRow a { color:#7d8a8a; font-size:12.5px; text-decoration:underline; }
-  #detail .checkLine { margin-top:12px; border-top:1px solid #e3e8e3; padding-top:8px; line-height:1.65; }
+  #detail .checkLine { margin-top:12px; border-top:1px solid #E3E9E4; padding-top:8px; line-height:1.65; }
   #detail .checkLine .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
   #dCheckRec { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-  #detail .sec { margin-top:12px; border:1px solid #e3e8e3; border-radius:10px; padding:8px 11px; background:#fbfcfb; line-height:1.65; }
+  #detail .sec { margin-top:12px; border:1px solid #E3E9E4; border-radius:10px; padding:8px 11px; background:#fbfcfb; line-height:1.65; }
   #detail .sec .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
   #detail .sec.ask { border-color:#f0c6c0; background:#fdf1ef; }
   #detail .sec.ask .secT { color:#b60205; }
   #detail .secSub { font-size:12px; color:#7d8a8a; margin-top:4px; }
-  #detail a.lnk { color:#1d76db; text-decoration:underline; }
+  #detail a.lnk { color:#356A59; text-decoration:underline; }
   #detail .close {
     position:absolute; top:8px; right:12px; border:none; background:none;
     font-size:16px; color:#7d8a8a; cursor:pointer;
@@ -69,13 +69,13 @@
   #settingsToggle {
     position:fixed; right:186px; top:12px; z-index:6;
     border:none; cursor:pointer; font-size:14px; font-weight:600;
-    padding:9px 16px; border-radius:999px; color:#3f4a4a;
+    padding:9px 16px; border-radius:999px; color:#273A34;
     background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
   }
   #settings {
     position:fixed; top:0; right:0; bottom:0; width:320px; max-width:92vw;
     background:rgba(255,255,255,.97); padding:20px 20px 16px;
-    box-shadow:-8px 0 28px rgba(0,0,0,.16); color:#3f4a4a; font-size:13.5px; line-height:1.7;
+    box-shadow:-8px 0 28px rgba(0,0,0,.16); color:#273A34; font-size:13.5px; line-height:1.7;
     z-index:10; transform:translateX(105%); transition:transform .28s ease; overflow-y:auto;
   }
   #settings.open { transform:none; }
@@ -92,12 +92,12 @@
   #settings .btns { margin-top:16px; display:flex; gap:8px; }
   #settings .btns button {
     flex:1; border:none; cursor:pointer; text-align:center; font-weight:600; font-size:13.5px;
-    background:#3f4a4a; color:#fff; border-radius:9px; padding:8px 0;
+    background:#356A59; color:#fff; border-radius:8px; padding:8px 0;
   }
   #settings .addTier {
     width:100%; margin-top:2px; padding:6px 0; cursor:pointer;
     border:1.5px dashed #c3ccc3; border-radius:8px; background:none;
-    color:#3f4a4a; font-size:12.5px; font-weight:600;
+    color:#273A34; font-size:12.5px; font-weight:600;
   }
   #settings .addTier:disabled { color:#aab5b5; cursor:default; }
   #settings .sdel {
@@ -108,7 +108,7 @@
   #editToggle {
     position:fixed; right:12px; top:12px; z-index:6;
     border:none; cursor:pointer; font-size:14px; font-weight:600;
-    padding:9px 16px; border-radius:999px; color:#3f4a4a;
+    padding:9px 16px; border-radius:999px; color:#273A34;
     background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
   }
   #editToggle.on { background:#d9a441; color:#fff; }
@@ -120,29 +120,29 @@
   #editbar button {
     display:block; width:100%; margin-bottom:6px; border:none; cursor:pointer;
     font-size:13px; font-weight:600; padding:8px 0; border-radius:8px;
-    background:#eef3f0; color:#3f4a4a;
+    background:#eef3f0; color:#273A34;
   }
   #editbar .note { font-size:11px; color:#7d8a8a; line-height:1.5; }
-  #editbar .sep { border-top:1px solid #e3e8e3; margin:8px 0; }
+  #editbar .sep { border-top:1px solid #E3E9E4; margin:8px 0; }
   #modeToggle { margin-top:8px; display:flex; gap:6px; }
   #modeToggle button {
     flex:1; border:none; cursor:pointer; font-size:13px; font-weight:700;
-    padding:7px 0; border-radius:8px; background:#eef3f0; color:#3f4a4a;
+    padding:7px 0; border-radius:8px; background:#eef3f0; color:#273A34;
   }
-  #modeToggle button.on { background:#3f4a4a; color:#fff; }
+  #modeToggle button.on { background:#356A59; color:#fff; }
   #board {
     position:fixed; inset:0; z-index:3; display:none;
-    background:#f4f1ea; padding:64px 14px 14px; box-sizing:border-box;
+    background:#F4F6F3; padding:64px 14px 14px; box-sizing:border-box;
     overflow:hidden; flex-direction:column;
   }
   #boardBar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; margin-left:336px; transition:margin-left .28s ease; }
   body.panel-mini #boardBar, body.panel-mini #boardScroll { margin-left:0; }
   #boardBar .chip {
     border:none; cursor:pointer; font-size:13px; font-weight:600;
-    padding:6px 14px; border-radius:999px; background:#fff; color:#3f4a4a;
+    padding:6px 14px; border-radius:999px; background:#fff; color:#273A34;
     box-shadow:0 1px 4px rgba(0,0,0,.08);
   }
-  #boardBar .chip.on { background:#3f4a4a; color:#fff; }
+  #boardBar .chip.on { background:#356A59; color:#fff; }
   #boardBar .spacer { flex:1; }
   #lanes { display:flex; gap:12px; flex:1; overflow-x:auto; align-items:flex-start; }
   .lane {
@@ -150,12 +150,12 @@
     border-radius:14px; padding:10px; min-height:200px;
   }
   .lane.over { outline:3px dashed #d9a441; outline-offset:-3px; }
-  .lane h3 { margin:2px 4px 10px; font-size:14px; color:#3f4a4a; }
+  .lane h3 { margin:2px 4px 10px; font-size:14px; color:#273A34; }
   .lane h3 .cnt { color:#7d8a8a; font-weight:600; }
   .sticky {
     background:#fffbe8; border-radius:6px; padding:9px 11px; margin-bottom:9px;
     box-shadow:0 2px 6px rgba(0,0,0,.13); cursor:grab; font-size:12.5px;
-    color:#3f4a4a; line-height:1.55; border-top:6px solid #ccc;
+    color:#273A34; line-height:1.55; border-top:6px solid #ccc;
   }
   .sticky:nth-child(odd) { transform:rotate(-.4deg); }
   .sticky:nth-child(even) { transform:rotate(.4deg); }
@@ -167,14 +167,14 @@
     border-radius:4px; padding:1px 6px; margin-bottom:4px;
   }
   .projGroup { margin-bottom:16px; }
-  .projGroup h3 { margin:2px 4px 10px; font-size:14px; color:#3f4a4a; }
+  .projGroup h3 { margin:2px 4px 10px; font-size:14px; color:#273A34; }
   .projGroup .cards { display:flex; flex-wrap:wrap; gap:10px; }
   .projGroup .sticky { width:230px; margin-bottom:0; }
   #boardScroll { flex:1; overflow:auto; margin-left:336px; transition:margin-left .28s ease; }
   #repoBar { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:12px; color:#7d8a8a; flex-wrap:nowrap; }
   #repoBar #repoName { font-weight:600; font-size:11px; color:#7d8a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   #refreshBtn {
-    border:none; cursor:pointer; background:none; color:#1d76db;
+    border:none; cursor:pointer; background:none; color:#356A59;
     padding:0; font-size:11.5px; font-weight:600; flex:none; text-decoration:underline;
   }
   #errBanner {
@@ -198,7 +198,7 @@
   .connectCard {
     background:#fff; border-radius:14px; padding:22px 24px; width:min(480px, 92vw);
     max-height:90vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.25);
-    font-size:13px; color:#3f4a4a;
+    font-size:13px; color:#273A34;
   }
   .connectCard .ttl { font-size:16px; font-weight:700; margin-bottom:8px; }
   .connectCard label { display:block; margin:12px 0 0; font-weight:600; }
@@ -211,14 +211,14 @@
   .connectCard .btns button {
     border:none; cursor:pointer; border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600;
   }
-  #connConnect { background:#35507a; color:#fff; }
-  #connCancel { background:#eef3f0; color:#3f4a4a; }
+  #connConnect { background:#356A59; color:#fff; }
+  #connCancel { background:#eef3f0; color:#273A34; }
   #connError { color:#b60205; margin-top:10px; display:none; }
   .connectHelp { color:#7d8a8a; font-size:12px; margin-top:14px; line-height:1.6; }
-  #connBox { border-top:1px solid #e3eae6; margin-top:14px; padding-top:12px; }
+  #connBox { border-top:1px solid #E3E9E4; margin-top:14px; padding-top:12px; }
   #connBox .ttl2 { font-weight:700; margin-bottom:4px; }
   #connBox button {
-    border:none; cursor:pointer; background:#eef3f0; color:#3f4a4a;
+    border:none; cursor:pointer; background:#eef3f0; color:#273A34;
     border-radius:8px; padding:5px 12px; font-size:12px; font-weight:600; margin-top:6px;
   }
 </style>
@@ -615,7 +615,7 @@ function resolveRoom(layout, roomId) {
 
 // ===== Three.js 基本 =====
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xeef0ee);
+scene.background = new THREE.Color(0xF4F6F3);
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 300);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 const appEl = document.getElementById('app');
@@ -653,7 +653,7 @@ function rbox(w, h, d, color, x, y, z, r = 0.04, parent = scene) {
   parent.add(m);
   return m;
 }
-function plateSprite(name, gold = false) {
+function plateSprite(text, gold = false) {
   const cv = document.createElement('canvas'); cv.width = 880; cv.height = 168;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = gold ? 'rgba(255,246,220,0.97)' : 'rgba(255,255,255,0.96)';
@@ -662,11 +662,15 @@ function plateSprite(name, gold = false) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#26322f';
-  const nm = name == null ? '' : String(name);
-  let fs = 76;
+  let t = text == null ? '' : String(text);
+  let fs = 62;
   ctx.font = `700 ${fs}px system-ui, sans-serif`;
-  while (ctx.measureText(nm).width > 800 && fs > 44) { fs -= 6; ctx.font = `700 ${fs}px system-ui, sans-serif`; }
-  ctx.fillText(nm, 440, 86);
+  while (ctx.measureText(t).width > 800 && fs > 34) { fs -= 4; ctx.font = `700 ${fs}px system-ui, sans-serif`; }
+  if (ctx.measureText(t).width > 800) {
+    while (t.length && ctx.measureText(t + '…').width > 800) t = t.slice(0, -1);
+    t += '…';
+  }
+  ctx.fillText(t, 440, 86);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
   sp.scale.set(1.7, 0.325, 1);
@@ -792,7 +796,7 @@ function person(parent, x, z, rotY, issue) {
     headG.add(cap, brim);
   }
   g.add(headG);
-  const plate = plateSprite(info.name, info.role === 'director');
+  const plate = plateSprite(info.title, info.role === 'director');
   plate.position.set(0, 1.52, 0);
   g.add(plate);
   const poseStatus = closedFig ? null : info.status;
