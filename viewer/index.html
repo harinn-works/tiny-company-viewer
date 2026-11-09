@@ -2476,9 +2476,9 @@ function updatePlateTiers() {
     if (!dist) continue;
     const wPx = 1.7 / (2 * dist * tanH) * hPx;
     let want = pl.tier;
-    if (pl.tier === 'full') { if (wPx < 190) want = 'short'; }
-    else if (pl.tier === 'short') { if (wPx > 210) want = 'full'; else if (wPx < 110) want = 'none'; }
-    else if (wPx > 130) want = 'short';
+    if (pl.tier === 'full') { if (wPx < 160) want = 'short'; }
+    else if (pl.tier === 'short') { if (wPx > 180) want = 'full'; else if (wPx < 70) want = 'none'; }
+    else if (wPx > 90) want = 'short';
     if (want !== pl.tier) {
       pl.tier = want;
       pl.full.visible = want === 'full';
