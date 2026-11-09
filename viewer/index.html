@@ -46,9 +46,11 @@
   #detail .row b { display:inline-block; width:58px; color:#7d8a8a; font-weight:600; font-size:12px; }
   #detail .btnMain { margin-top:14px; }
   #detail .btnMain a {
-    display:block; text-align:center; text-decoration:none; font-weight:700;
-    background:#356A59; color:#fff; border-radius:8px; padding:10px 0;
+    display:block; text-align:center; text-decoration:none; font-weight:700; font-size:15.5px;
+    background:#356A59; color:#fff; border-radius:8px; padding:13px 0;
   }
+  #detail .row.chatLink { cursor:pointer; }
+  #detail .row.chatLink:hover .lnk { text-decoration:underline; }
   #detail .linkRow { margin-top:12px; display:flex; gap:18px; }
   #detail .linkRow a { color:#356A59; text-decoration:underline; font-size:13px; font-weight:600; }
   #detail .mgmtRow { margin-top:16px; border-top:1px solid #E3E9E4; padding-top:10px; }
@@ -56,11 +58,10 @@
   #plateTip { position:fixed; z-index:60; max-width:320px; background:#ffffff; border:1px solid #E3E9E4; border-radius:8px; padding:6px 10px; font-size:14px; line-height:1.5; color:#273A34; box-shadow:0 4px 16px rgba(39,58,52,0.14); pointer-events:none; }
   #detail .pcItem { display:flex; gap:8px; margin-top:4px; }
   #detail .pcLbl { flex:0 0 34px; font-size:11.5px; font-weight:700; color:#7d8a8a; padding-top:2px; }
-  #detail .pcTxt.clamp { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-  #detail .pcMore { margin-top:6px; background:none; border:none; color:#356A59; font-size:12.5px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline; }
-  #detail .taskRow { display:flex; align-items:center; gap:6px; padding:2px 0; cursor:pointer; }
+  #detail .pcTxt { white-space:pre-wrap; }
+  #detail .taskRow { display:flex; align-items:center; gap:6px; padding:3px 6px; margin:0 -6px; border-radius:6px; cursor:pointer; }
   #detail .taskRow:hover { text-decoration:underline; }
-  #detail .taskRow.cur { font-weight:700; cursor:default; text-decoration:none; }
+  #detail .taskRow.cur { font-weight:700; cursor:default; text-decoration:none; background:#F4F6F3; }
   #detail .checkLine { margin-top:12px; border-top:1px solid #E3E9E4; padding-top:8px; line-height:1.65; }
   #detail .checkLine .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
   #dCheckRec { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
@@ -286,21 +287,19 @@
   <button class="close" id="detailClose">✕</button>
   <div class="ttl" id="dTitle"></div>
   <div class="row"><b>状態</b><span id="dStatus"></span></div>
+  <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
   <div class="row"><b>担当</b><span id="dName"></span></div>
-  <div class="row"><b>Issue</b><span id="dIssueNum"></span></div>
   <div class="row"><b>最終更新</b><span id="dUpdated"></span></div>
   <div class="row" id="dParentRow" style="display:none"><b>親</b><span id="dParent"></span></div>
   <div class="row" id="dProgRow" style="display:none"><b>子Issue</b><span id="dProg"></span></div>
-  <div class="row" id="dTasksRow" style="display:none"><b>この人のタスク</b><span id="dTasks"></span></div>
   <div class="row"><b>成果物</b><span id="dOut"></span></div>
-  <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
-  <div class="checkLine" id="dCheckSec" style="display:none"><div class="secT" id="dCheckT">一次確認</div><div class="pcItem"><span class="pcLbl">推奨</span><div class="pcTxt clamp" id="dCheckRec"></div></div><div class="pcItem" id="dCheckConRow" style="display:none"><span class="pcLbl">懸念</span><div class="pcTxt clamp" id="dCheckCon"></div></div><button class="pcMore" id="dCheckMore" style="display:none">全文を表示</button></div>
+  <div class="row" id="dTasksRow" style="display:none"><b>この人のタスク</b><span id="dTasks"></span></div>
+  <div class="checkLine" id="dCheckSec" style="display:none"><div class="pcItem"><span class="pcLbl">推奨</span><div class="pcTxt" id="dCheckRec"></div></div><div class="pcItem" id="dCheckConRow" style="display:none"><span class="pcLbl">懸念</span><div class="pcTxt" id="dCheckCon"></div></div></div>
+  <div class="linkRow">
+    <a href="#" id="dIssue"></a>
+  </div>
   <div class="btnMain" id="dMainRow" style="display:none">
     <a href="#" id="dParentChat">報告先のチャットを開く</a>
-  </div>
-  <div class="linkRow">
-    <a href="#" id="dIssue">Issueを開く</a>
-    <a href="#" id="dChat" style="display:none">チャットを開く</a>
   </div>
   <div class="mgmtRow" id="dMgmtRow" style="display:none"><a href="#" id="dHideBtn">キャラを隠す</a></div>
 </div>
@@ -1463,9 +1462,8 @@ function showDetail(info, anchorWorld) {
   detailInfo = info;
   if (anchorWorld) detailAnchor = anchorWorld;
   document.getElementById('dTitle').textContent = info.title;
-  const seatDef = info.role ? SETTINGS.seats[info.role] : null;
-  document.getElementById('dName').textContent =
-    `${info.name}（${seatDef ? seatDef.display : '席なし'}）`;
+  // 担当は名前だけ出す（役職は後付けしない。#23 デザイン）
+  document.getElementById('dName').textContent = info.name || '';
   const st = info.status ? SETTINGS.statuses[info.status] : null;
   const dStatusEl = document.getElementById('dStatus');
   const issForState = issueByNum(info.number);
@@ -1481,9 +1479,9 @@ function showDetail(info, anchorWorld) {
   } else {
     dStatusEl.textContent = '（状態なし）';
   }
-  document.getElementById('dIssueNum').textContent = '#' + info.number;
   const issue = issueByNum(info.number);
   const dIssueEl = document.getElementById('dIssue');
+  dIssueEl.textContent = `#${info.number} ${info.title}`;
   if (issue && issue.url) {
     dIssueEl.href = issue.url;
     dIssueEl.target = '_blank';
@@ -1498,7 +1496,7 @@ function showDetail(info, anchorWorld) {
     const p = issueByNum(issue.parent);
     prow.style.display = '';
     document.getElementById('dParent').textContent =
-      p ? `#${p.number} ${p.title}（${p.assignee || '担当未記入'}）` : '#' + issue.parent;
+      p ? `#${p.number} ${p.title}` : '#' + issue.parent;
   } else {
     prow.style.display = 'none';
   }
@@ -1546,29 +1544,16 @@ function showDetail(info, anchorWorld) {
   }
   const csec = document.getElementById('dCheckSec');
   if (issue && issue.preCheck) {
+    // 「一次確認」の見出しは出さず、推奨・懸念を全文のまま表示する（#23 デザイン）
     csec.style.display = '';
-    document.getElementById('dCheckT').textContent =
-      '一次確認（' + (issue.preCheck.by || '上司') + '）';
-    const recEl = document.getElementById('dCheckRec');
-    recEl.textContent = issue.preCheck.recommend || '';
-    recEl.classList.add('clamp');
+    document.getElementById('dCheckRec').textContent = issue.preCheck.recommend || '';
     const conRow = document.getElementById('dCheckConRow');
-    const conEl = document.getElementById('dCheckCon');
     if (issue.preCheck.concerns) {
       conRow.style.display = '';
-      conEl.textContent = issue.preCheck.concerns;
-      conEl.classList.add('clamp');
+      document.getElementById('dCheckCon').textContent = issue.preCheck.concerns;
     } else {
       conRow.style.display = 'none';
     }
-    const moreBtn = document.getElementById('dCheckMore');
-    moreBtn.style.display = 'none';
-    moreBtn.textContent = '全文を表示';
-    moreBtn.dataset.open = '';
-    requestAnimationFrame(() => {
-      const overflow = [recEl, conEl].some(el => el.offsetParent !== null && el.scrollHeight > el.clientHeight + 2);
-      moreBtn.style.display = overflow ? '' : 'none';
-    });
   } else {
     csec.style.display = 'none';
   }
@@ -1630,15 +1615,6 @@ document.getElementById('detailClose').addEventListener('click', () => {
   closeDetail();
   ring.visible = false;
 });
-document.getElementById('dCheckMore').addEventListener('click', e => {
-  const btn = e.currentTarget;
-  const open = btn.dataset.open === '1';
-  document.getElementById('dCheckRec').classList.toggle('clamp', open);
-  document.getElementById('dCheckCon').classList.toggle('clamp', open);
-  btn.dataset.open = open ? '' : '1';
-  btn.textContent = open ? '全文を表示' : '折りたたむ';
-});
-
 // ===== 設定画面 =====
 const settingsBody = document.getElementById('settingsBody');
 const hexOf = n => '#' + n.toString(16).padStart(6, '0');
@@ -1904,25 +1880,17 @@ document.getElementById('dHideBtn').addEventListener('click', async e => {
   }
 });
 
-// チャット参照（構造化）: URLがある場合だけボタンを出す
+// チャット参照（構造化）: 行全体がリンクになる（独立した「チャットを開く」は置かない。#23 デザイン）
 const chatRow = document.createElement('div');
 chatRow.className = 'row';
 chatRow.style.display = 'none';
 chatRow.innerHTML = '<b>チャット</b><span id="dChatName"></span>';
-detail.insertBefore(chatRow, detail.querySelector('.btnMain'));
-const dChatBtn = document.getElementById('dChat');
+detail.insertBefore(chatRow, detail.querySelector('.linkRow'));
 function updateChatUI(info) {
 const issue = issueByNum(info.number);
 const chat = issue && issue.chat ? issue.chat : null;
-if (chat && chat.url) {
-dChatBtn.style.display = '';
-dChatBtn.href = chat.url;
-dChatBtn.target = '_blank';
-dChatBtn.rel = 'noopener';
-} else {
-dChatBtn.style.display = 'none';
-dChatBtn.removeAttribute('href');
-}
+chatRow.onclick = null;
+chatRow.classList.remove('chatLink');
 if (chat && chat.label) {
 chatRow.style.display = '';
 const nameEl = document.getElementById('dChatName');
@@ -1932,6 +1900,11 @@ const a = document.createElement('a');
 a.href = chat.url; a.target = '_blank'; a.rel = 'noopener';
 a.className = 'lnk'; a.textContent = chat.label;
 nameEl.appendChild(a);
+chatRow.classList.add('chatLink');
+chatRow.onclick = e => {
+  if (e.target.closest('a')) return; // リンク自体のクリックはリンクに任せる
+  window.open(chat.url, '_blank', 'noopener');
+};
 } else {
 nameEl.textContent = chat.label;
 }
@@ -2681,9 +2654,7 @@ async function autoRefreshTick() {
     stampUpdated();
     if (JSON.stringify(data) === lastDataJson) return;
     lastDataJson = JSON.stringify(data);
-    const openNum = detail.classList.contains('open')
-      ? parseInt((document.getElementById('dIssueNum').textContent || '').replace('#', ''), 10) || null
-      : null;
+    const openNum = detail.classList.contains('open') && detailInfo ? detailInfo.number : null;
     SETTINGS = convertSettings(data.settings || {});
     BUILDING = data.building || BUILDING;
     LAYOUTS = data.layouts || {};
