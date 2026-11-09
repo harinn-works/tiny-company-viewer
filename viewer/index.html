@@ -1254,7 +1254,11 @@ function showDetail(info, anchorWorld) {
     `${info.name}（${seatDef ? seatDef.display : '席なし'}）`;
   const st = info.status ? SETTINGS.statuses[info.status] : null;
   const dStatusEl = document.getElementById('dStatus');
-  if (st) {
+  const issForState = issueByNum(info.number);
+  const isClosed = !!(issForState && issForState.state === 'closed');
+  if (isClosed) {
+    dStatusEl.innerHTML = '<span class="dot" style="background:#6B7280"></span>完了（クローズ）';
+  } else if (st) {
     const hex = '#' + st.color.toString(16).padStart(6, '0');
     dStatusEl.innerHTML =
       `<span class="dot" style="background:${hex}"></span>${st.display}`;
@@ -1292,17 +1296,17 @@ function showDetail(info, anchorWorld) {
   if (targetChat && issue) {
     pcBtn.style.display = '';
     pcBtn.dataset.url = targetChat;
-    pcBtn.dataset.copy = info.status === 'waiting_review'
+    pcBtn.dataset.copy = info.status === 'waiting_review' && !isClosed
       ? `Issue #${issue.number}「${issue.title}」の作業が完了しました。報告書を確認してください。`
       : `Issue #${issue.number}「${issue.title}」について連絡します。`;
-    pcBtn.classList.toggle('primary', info.status === 'waiting_review');
+    pcBtn.classList.toggle('primary', info.status === 'waiting_review' && !isClosed);
     pcBtn.textContent = '報告先のチャットを開く';
   } else {
     pcBtn.style.display = 'none';
     delete pcBtn.dataset.url;
   }
   const asec = document.getElementById('dAskSec');
-  if (info.ask && info.status === 'waiting_approval') {
+  if (info.ask && info.status === 'waiting_approval' && !isClosed) {
     asec.style.display = '';
     document.getElementById('dAsk').textContent = info.ask;
   } else {
@@ -2368,12 +2372,13 @@ async function autoRefreshTick() {
 }
 window.autoRefreshTick = autoRefreshTick;
 // 7秒ごとに「変わったか」だけを ETag で確認する（変更なしの応答は回数制限に数えられない）。
-// 変更を検知したら全取得するが、全取得どうしの間隔は最低10秒あける。
-// 120秒ごとの全取得は、見張りで拾えない変化のための安全網。
+// 見張りはタブが裏でも止めない（裏ではブラウザのタイマー間引きで間隔が伸びる）。
+// 重い全取得は「見えているとき」だけ行い、裏で検知した変更はタブに戻った時点で取り込む。
+// 全取得どうしの間隔は最低10秒あける。120秒ごとの全取得は、見張りで拾えない変化のための安全網。
 let probePending = false;
 let probing = false;
 async function probeTick() {
-  if (probing || document.hidden) return;
+  if (probing) return;
   const cfg = window.TCGitHub && TCGitHub.getConfig();
   if (!cfg || !TCGitHub.probeChanges) return;
   if (editMode) return;
@@ -2384,7 +2389,7 @@ async function probeTick() {
     if (await TCGitHub.probeChanges(cfg)) probePending = true;
   } catch (e) { /* 見張りの失敗は静かに無視する（安全網の全取得に任せる） */ }
   finally { probing = false; }
-  if (probePending && Date.now() - lastFullRefreshAt >= 10000) {
+  if (probePending && !document.hidden && Date.now() - lastFullRefreshAt >= 10000) {
     probePending = false;
     autoRefreshTick();
   }
