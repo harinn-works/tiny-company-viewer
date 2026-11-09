@@ -1943,6 +1943,31 @@ chatRow.style.display = 'none';
 
 // ===== 編集モード =====
 let editMode = false;
+let editBaseline = null; // 編集開始時点の保存対象スナップショット（未保存の変更の検出用）
+function snapshotEditState() {
+  const parts = {};
+  for (const id of Object.keys(LAYOUTS)) {
+    try { parts[id] = JSON.stringify(cleanLayout(LAYOUTS[id], id)); } catch (e) { /* 比較対象外 */ }
+  }
+  return JSON.stringify({ layouts: parts, building: BUILDING });
+}
+function editDirty() {
+  if (!editBaseline) return false;
+  try { return snapshotEditState() !== editBaseline; } catch (e) { return false; }
+}
+async function saveDirtyEdits() {
+  if (!editBaseline) return;
+  let base = null;
+  try { base = JSON.parse(editBaseline); } catch (e) { /* noop */ }
+  if (!base) return;
+  if (JSON.stringify(BUILDING) !== base.building) await saveOrDownload('board/building.json', BUILDING, 'building.json');
+  for (const id of Object.keys(LAYOUTS)) {
+    let cur = null;
+    try { cur = JSON.stringify(cleanLayout(LAYOUTS[id], id)); } catch (e) { /* noop */ }
+    if (cur && base.layouts[id] !== cur) await saveOrDownload(`rooms/${id}/layout.json`, cleanLayout(LAYOUTS[id], id), `layout-${id}.json`);
+  }
+  editBaseline = snapshotEditState();
+}
 
 let selected = null; // 島 or 部署グループ
 let selectedRoom = null; // 全体ビューで選択中の部屋グループ
@@ -1959,6 +1984,7 @@ const editbar = document.getElementById('editbar');
 const isRoomView = () =>!!LAYOUTS[currentViewKey];
 
 function setEditMode(on) {
+if (on && !editMode) editBaseline = snapshotEditState();
 editMode = on;
 editToggle.classList.toggle('on', on);
 editToggle.textContent = on? '✏️ 編集中（終了）': '✏️ 編集モード';
@@ -1968,13 +1994,21 @@ for (const g of deptEditables) g.userData.handle.visible = on && isRoomView();
 if (!on) { selected = null; selectedRoom = null; dragTarget = null; ring.visible = false;}
 renderEditbar();
 }
-editToggle.addEventListener('click', () => {
+editToggle.addEventListener('click', async () => {
 if (!editMode && currentViewKey!== 'all' &&!isRoomView()) {
 editToggle.textContent = '全体か部屋タブで編集できます';
 setTimeout(() => { if (!editMode) editToggle.textContent = '✏️ 編集モード';}, 1600);
 return;
 }
 const entering = !editMode;
+if (!entering && editDirty()) {
+  // 未保存の変更があるまま終えると、自動更新で元に戻ってしまう。先に保存するか確認する
+  if (confirm('保存されていない変更があります。保存して終了しますか？\n（キャンセルすると、保存せず終了するか改めて確認します）')) {
+    await saveDirtyEdits();
+  } else if (!confirm('保存せずに終了しますか？\n変更は自動更新で元に戻ります。')) {
+    return; // 編集を続ける
+  }
+}
 setEditMode(!editMode);
 if (entering) {
   // 編集モードでは全室表示する：表示フラグを立ててからビューを作り直し、編集UIを戻す
@@ -1982,9 +2016,11 @@ if (entering) {
   const k = currentViewKey;
   switchView(k);
   setEditMode(true);
+  editBaseline = snapshotEditState(); // 作り直し後の状態を未保存チェックの基準にする
   buildTabs();
 } else {
   editShowAll = false;
+  editBaseline = null;
   if (roomHidden(currentViewKey)) switchView('all');
   else buildTabs();
 }
@@ -2334,7 +2370,8 @@ return merged;
 function saveLayout() {
 const roomId = currentViewKey;
 if (!LAYOUTS[roomId]) return;
-saveOrDownload(`rooms/${roomId}/layout.json`, cleanLayout(LAYOUTS[roomId], roomId), `layout-${roomId}.json`);
+saveOrDownload(`rooms/${roomId}/layout.json`, cleanLayout(LAYOUTS[roomId], roomId), `layout-${roomId}.json`)
+  .then(() => { if (editMode) editBaseline = snapshotEditState(); });
 }
 function addRoom() {
 const n = BUILDING.rooms.length + 1;
@@ -2353,7 +2390,8 @@ switchView('all');
 setEditMode(true);
 }
 function saveBuilding() {
-saveOrDownload('board/building.json', BUILDING, 'building.json');
+saveOrDownload('board/building.json', BUILDING, 'building.json')
+  .then(() => { if (editMode) editBaseline = snapshotEditState(); });
 }
 
 // ===== 付箋一覧モード =====
@@ -2608,6 +2646,7 @@ function boot() {
   switchView('all');
 }
 async function refreshData() {
+  if (editMode) { showToast('編集中は再取得できません（先に保存・終了してください）'); return; }
   try {
     await loadCompany();
     stampUpdated();
@@ -2638,6 +2677,8 @@ async function autoRefreshTick() {
   lastFullRefreshAt = Date.now();
   try {
     const data = await TCGitHub.loadCompany(cfg);
+    // 取得の間に編集が始まっていたら、未保存の変更を守るため今回は反映しない
+    if (editMode) return;
     stampUpdated();
     if (JSON.stringify(data) === lastDataJson) return;
     lastDataJson = JSON.stringify(data);
