@@ -677,10 +677,13 @@ function rbox(w, h, d, color, x, y, z, r = 0.04, parent = scene) {
   parent.add(m);
   return m;
 }
+// 3D 内テキストのフォント：可読性優先（太く・大きめ・和文フォント指定）
+const TEXT_FONT_STACK = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif';
+const PLATE_FONT = `800 76px ${TEXT_FONT_STACK}`;
 // 名札の表示タイトル：フォントは縮めず、意味の区切りで最大2行に折る（#19 デザイン）
 function splitTitleLines(text, ctx, maxW) {
   const t = text == null ? '' : String(text);
-  ctx.font = '700 58px system-ui, sans-serif';
+  ctx.font = PLATE_FONT;
   if (ctx.measureText(t).width <= maxW) return [t];
   const breaks = [];
   for (let i = 2; i < t.length - 1; i++) {
@@ -717,9 +720,9 @@ function plateSpriteFrom(lines, gold) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#26322f';
-  ctx.font = '700 58px system-ui, sans-serif';
-  if (lines.length === 1) ctx.fillText(lines[0], 440, h / 2 + 1);
-  else { ctx.fillText(lines[0], 440, 82); ctx.fillText(lines[1], 440, 168); }
+  ctx.font = PLATE_FONT;
+  if (lines.length === 1) ctx.fillText(lines[0], 440, h / 2 + 2);
+  else { ctx.fillText(lines[0], 440, 80); ctx.fillText(lines[1], 440, 172); }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
   sp.scale.set(1.7, 1.7 * h / 880, 1);
@@ -734,7 +737,7 @@ function makePlates(text, gold = false) {
   let shortLines = lines;
   if (lines.length > 1) {
     let t = lines[0];
-    mctx.font = '700 58px system-ui, sans-serif';
+    mctx.font = PLATE_FONT;
     while (t.length > 1 && mctx.measureText(t + '…').width > 480) t = t.slice(0, -1);
     shortLines = [t + '…'];
   }
@@ -751,7 +754,7 @@ function textSprite(text, scale = 1) {
   ctx.beginPath(); ctx.roundRect(32, 24, 704, 144, 40); ctx.fill();
   ctx.strokeStyle = 'rgba(36,50,50,0.4)'; ctx.lineWidth = 8; ctx.stroke();
   ctx.fillStyle = '#243232';
-  ctx.font = '700 78px system-ui, sans-serif';
+  ctx.font = `800 84px ${TEXT_FONT_STACK}`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, 384, 100);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
@@ -1000,7 +1003,7 @@ function buildIsland(parent, islLayout, seatsOfIsland) {
   }
   return g;
 }
-function buildDeptRug(parent, dept) {
+function buildDeptRug(parent, dept, showSign = true) {
   const g = new THREE.Group();
   g.position.set(dept.x || 0, 0, dept.z || 0);
   g.userData.isDept = true;
@@ -1013,7 +1016,9 @@ function buildDeptRug(parent, dept) {
   rug.userData.isRugMesh = true;
   g.add(rug);
   const sign = textSprite(dept.name);
-  sign.position.set(-(dept.w || 4.4) / 2 + 0.9, 1.05, -(dept.d || 3.1) / 2 + 0.2);
+  // 名前は絨毯の右下に置く（人や名札と被らせない）。部署が1つだけの部屋では出さない
+  sign.position.set((dept.w || 4.4) / 2 - 1.0, 0.9, (dept.d || 3.1) / 2 - 0.35);
+  sign.visible = showSign;
   sign.userData.isSign = true;
   g.add(sign);
   const handle = rbox(0.34, 0.16, 0.34, 0xd9a441, (dept.w || 4.4) / 2, 0.1, (dept.d || 3.1) / 2, 0.05, g);
@@ -1029,12 +1034,13 @@ function buildDeptRug(parent, dept) {
 function refreshDeptRug(g) {
   const dept = g.userData.layoutRef;
   g.userData.rugMesh.scale.set(dept.w, 1, dept.d);
-  g.userData.sign.position.set(-dept.w / 2 + 0.9, 1.05, -dept.d / 2 + 0.2);
+  g.userData.sign.position.set(dept.w / 2 - 1.0, 0.9, dept.d / 2 - 0.35);
   g.userData.handle.position.set(dept.w / 2, 0.1, dept.d / 2);
 }
 function buildRoomContents(parent, effLayout, roomId, furniture = true) {
   const seats = resolveRoom(effLayout, roomId);
-  for (const dept of effLayout.departments) buildDeptRug(parent, dept);
+  const showDeptNames = effLayout.departments.length > 1;
+  for (const dept of effLayout.departments) buildDeptRug(parent, dept, showDeptNames);
   for (const isl of effLayout.islands) {
     buildIsland(parent, isl, seats.filter(s => s.isl === isl));
   }
