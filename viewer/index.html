@@ -34,7 +34,7 @@
     background:rgba(255,255,255,.85); box-shadow:0 2px 8px rgba(0,0,0,.08);
   }
   #tabs button.on { background:#3f4a4a; color:#fff; }
-  #tabs button.archived { opacity:.45; text-decoration:line-through; }
+
   #detail {
     position:fixed; top:0; right:0; bottom:0; width:352px; max-width:92vw;
     background:rgba(255,255,255,.97); border-radius:0; padding:20px 20px 16px;
@@ -337,7 +337,7 @@ let BUILDING = {
   rooms: [
     { id: 'lp',        name: 'LP制作',        slot: 0, archived: false },
     { id: 'housetodo', name: 'HouseToDo開発', slot: 1, archived: false },
-    { id: 'old-portfolio', name: '旧ポートフォリオ', slot: 2, archived: true },
+    { id: 'old-portfolio', name: '旧ポートフォリオ', slot: 2, archived: false },
     { id: 'free', name: 'フリー部屋', slot: 3, archived: false }
   ]
 };
@@ -422,7 +422,8 @@ let ISSUES = [
     chat: { label: 'Muse サイドチャット「開発：エージェント作業ボード」', url: 'https://muse.ai/' } },
   { number: 61, title: '単発の相談（献立どうする）', assignee: 'Muse', seat: 'member', room: 'free', status: 'working', state: 'open', parent: null, out: null, ask: null,
     chat: { label: 'Muse メインチャット' } },
-  { number: 102, title: '秘書・伝令', assignee: 'Muse', seat: 'secretary', room: null, status: 'working', state: 'open', parent: 101, out: '（伝令）', ask: null }
+  { number: 102, title: '秘書・伝令', assignee: 'Muse', seat: 'secretary', room: null, status: 'working', state: 'open', parent: 101, out: '（伝令）', ask: null },
+  { number: 62, title: '旧ポートフォリオの管理', assignee: 'Muse', seat: 'bucho', bucho: true, room: 'old-portfolio', status: 'waiting_review', state: 'closed', parent: null, out: '（管理Issue）', ask: null, hidden: true }
 ];
 let SETTINGS_RAW = null; // サーバー取得した settings.json の生データ（保存時のマージ用）
 let REPO_NAME = null;    // 接続中の会社 repo（owner/name）
@@ -555,7 +556,7 @@ function ensureLayout(roomId) {
 // layout が無い部屋は ensureLayout が部署「メイン」を合成し、ここで4席の島を必要数だけ足す（契約4）。
 function prepareLayout(roomId) {
   const L = ensureLayout(roomId);
-  const members = ISSUES.filter(i => i.room === roomId && !i.hidden && i.seat === 'member');
+  const members = ISSUES.filter(i => i.room === roomId && !personHidden(i) && i.seat === 'member');
   if (members.length) {
     ensureDepartment(L);
     const seatCount = () => L.islands.reduce((s, isl) => s + (isl.memberSeats || []).length, 0);
@@ -587,8 +588,8 @@ function rootBuchoNum(issue) {
   return top ? top.number : issue.number;
 }
 function resolveRoom(layout, roomId) {
-  // 着席対象：閉じた人も座る（帽子がグレーになる）。「非表示」ラベルの人だけ座らない
-  const open = ISSUES.filter(i => i.room === roomId && !i.hidden);
+  // 着席対象：閉じた人も座る（帽子がグレーになる）。非表示の人（部屋ごと非表示を含む）だけ座らない
+  const open = ISSUES.filter(i => i.room === roomId && !personHidden(i));
   const byNum = new Map(open.map(i => [i.number, i]));
   const seats = [];
   for (const isl of layout.islands) {
@@ -971,8 +972,8 @@ function buildDirector(parent, furniture = true) {
   mg.position.set(0, 0.72, -2.55); mg.rotation.y = Math.PI;
   parent.add(mg);
   monitor(mg, 0, 0.04, -0.08);
-  if (issue && !issue.hidden) person(parent, 0, -3.3, Math.PI, issue);
-  const sec = ISSUES.find(i => i.seat === 'secretary' && !i.hidden);
+  if (issue && !personHidden(issue)) person(parent, 0, -3.3, Math.PI, issue);
+  const sec = ISSUES.find(i => i.seat === 'secretary' && !personHidden(i));
   if (sec) seatSolo(parent, 2.05, -1.1, Math.PI / 2, sec);
   if (!furniture) return;
   rbox(3.6, 0.08, 1.3, 0xf4f5f3, 0, 0.66, 0.6, 0.03, parent);
@@ -1034,7 +1035,18 @@ function roomBoxInto(parent, w, d, floorColor, accent, name) {
 }
 const ROOM_FLOORS = [0xf3ead8, 0xe6edf2, 0xf2e6ee, 0xe8f0e4];
 const ROOM_ACCENTS = [0x9cc184, 0x7ea6c9, 0xd98cb3, 0x8fb8ad];
-const visibleRooms = () => BUILDING.rooms.filter(r => !r.archived).sort((a, b) => a.slot - b.slot);
+// ===== 表示判定（人と部屋で共通化） =====
+// 人：自分の「非表示」ラベルで消える。部屋：部長（管理Issue）の表示状態に従う。
+// 部長がいない部屋は未開始として表示し、フリー部屋は常時表示する。
+let editShowAll = false; // 編集モードでは全室表示する
+function roomHidden(roomId) {
+  if (roomId === 'free') return false;
+  const mgrs = ISSUES.filter(i => i.room === roomId && i.bucho);
+  if (!mgrs.length) return false; // 部長がいない部屋は未開始として表示
+  return mgrs.every(m => m.hidden); // 部長全員が非表示のときだけ部屋が終わる
+}
+function personHidden(issue) { return !!issue.hidden || (issue.room ? roomHidden(issue.room) : false); }
+const visibleRooms = () => BUILDING.rooms.filter(r => editShowAll || !roomHidden(r.id)).sort((a, b) => a.slot - b.slot);
 const roomBoxW = room => (LAYOUTS[room.id] ? LAYOUTS[room.id].size.w : 10.6) + 1.2;
 const roomBoxD = room => (LAYOUTS[room.id] ? LAYOUTS[room.id].size.d : 8.6) + 1.2;
 
@@ -1163,7 +1175,7 @@ function renderLegend() {
   const counts = {};
   let doneCount = 0;
   for (const i of scoped) {
-    if (i.hidden) continue;
+    if (personHidden(i)) continue;
     if (i.state === 'closed') { doneCount++; continue; }
     if (!i.status) continue; // status が無い Issue（社長など）は人数に数えない
     counts[i.status] = (counts[i.status] || 0) + 1;
@@ -1615,6 +1627,9 @@ document.getElementById('dHideBtn').addEventListener('click', async e => {
   const cfg = TCGitHub.getConfig();
   if (!cfg) return;
   const toHide = !btn.dataset.hidden;
+  const issForHide = issueByNum(num);
+  if (toHide && issForHide && issForHide.bucho
+      && !confirm('部長を非表示にすると、この部屋ごと表示されなくなります。よいですか？')) return;
   const old = btn.textContent;
   btn.textContent = '切り替え中…';
   try {
@@ -1664,7 +1679,7 @@ chatRow.style.display = 'none';
 
 // ===== 編集モード =====
 let editMode = false;
-let archiveListOpen = false;
+
 let selected = null; // 島 or 部署グループ
 let selectedRoom = null; // 全体ビューで選択中の部屋グループ
 const deadRoots = new Set();
@@ -1681,7 +1696,6 @@ const isRoomView = () =>!!LAYOUTS[currentViewKey];
 
 function setEditMode(on) {
 editMode = on;
-if (!on) archiveListOpen = false;
 editToggle.classList.toggle('on', on);
 editToggle.textContent = on? '✏️ 編集中（終了）': '✏️ 編集モード';
 editbar.style.display = on? 'block': 'none';
@@ -1696,7 +1710,20 @@ editToggle.textContent = '全体か部屋タブで編集できます';
 setTimeout(() => { if (!editMode) editToggle.textContent = '✏️ 編集モード';}, 1600);
 return;
 }
+const entering = !editMode;
 setEditMode(!editMode);
+if (entering) {
+  // 編集モードでは全室表示する：表示フラグを立ててからビューを作り直し、編集UIを戻す
+  editShowAll = true;
+  const k = currentViewKey;
+  switchView(k);
+  setEditMode(true);
+  buildTabs();
+} else {
+  editShowAll = false;
+  if (roomHidden(currentViewKey)) switchView('all');
+  else buildTabs();
+}
 });
 function mkBtn(label, fn) {
 const b = document.createElement('button');
@@ -1709,19 +1736,6 @@ editbar.innerHTML = '';
 if (!editMode) return;
 const note = document.createElement('div');
 note.className = 'note';
-if (currentViewKey === 'all' && archiveListOpen) {
-editbar.appendChild(mkBtn('← 戻る', () => { archiveListOpen = false; renderEditbar(); }));
-const arch = BUILDING.rooms.filter(r => r.archived);
-if (!arch.length) {
-const empty = document.createElement('div'); empty.className = 'note';
-empty.textContent = 'アーカイブ済みの部屋はありません';
-editbar.appendChild(empty);
-}
-for (const r of arch) editbar.appendChild(mkBtn(`↩ 『${r.name}』を戻す`, () => restoreRoom(r.id)));
-note.textContent = 'アーカイブ済みの部屋の一覧です。戻すと全体ビューに再表示されます';
-editbar.appendChild(note);
-return;
-}
 if (isRoomView()) {
 editbar.append(
 mkBtn('＋ 島を追加', addIsland),
@@ -1737,11 +1751,9 @@ note.textContent = '島・部署エリアをドラッグで移動。部署の角
 } else if (currentViewKey === 'all') {
 editbar.append(
 mkBtn('＋ 部屋を追加', addRoom),
-mkBtn('📦 選択した部屋をアーカイブ', archiveSelectedRoom),
 mkBtn('building.json保存', saveBuilding)
 );
-editbar.appendChild(mkBtn(`🗄 アーカイブ済みの部屋（${BUILDING.rooms.filter(r => r.archived).length}）`, () => { archiveListOpen = true; renderEditbar(); }));
-note.textContent = '部屋をドラッグすると並び替え。アーカイブの確認と復元は「アーカイブ済みの部屋」から';
+note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります';
 }
 editbar.appendChild(note);
 }
@@ -2063,7 +2075,7 @@ saveOrDownload(`rooms/${roomId}/layout.json`, cleanLayout(LAYOUTS[roomId], roomI
 function addRoom() {
 const n = BUILDING.rooms.length + 1;
 const id = 'room-' + Date.now().toString(36);
-BUILDING.rooms.push({ id, name: '新しい部屋' + n, slot: 99, archived: false});
+BUILDING.rooms.push({ id, name: '新しい部屋' + n, slot: 99 });
 LAYOUTS[id] = {
 version: 2,
 departments: [ { id: 'main', name: 'メイン', rugColor: '#e8e2d0'}],
@@ -2071,31 +2083,7 @@ islands: [],
 props: []
 };
 LAYOUTS[id] = effectiveLayout(id);
-BUILDING.rooms.forEach((r, i) => { if (!r.archived) r.slot = visibleRooms().findIndex(v => v.id === r.id);});
-buildTabs();
-switchView('all');
-setEditMode(true);
-}
-function archiveSelectedRoom() {
-if (!selectedRoom) return;
-const room = BUILDING.rooms.find(r => r.id === selectedRoom.userData.roomId);
-if (!room) return;
-const openCount = ISSUES.filter(i => i.room === room.id && i.state === 'open').length;
-const msg = openCount > 0
-? `『${room.name}』には作業中のIssueが ${openCount} 件あります。アーカイブしますか？（部屋のデータは消えません）`
-: `『${room.name}』をアーカイブしますか？（部屋のデータは消えません）`;
-if (!confirm(msg)) return;
-room.archived = true;
-selectedRoom = null;
-buildTabs();
-switchView('all');
-}
-function restoreRoom(id) {
-const room = BUILDING.rooms.find(r => r.id === id);
-if (!room) return;
-room.archived = false;
-archiveListOpen = BUILDING.rooms.some(r => r.archived);
-room.slot = visibleRooms().length;
+BUILDING.rooms.forEach((r, i) => { r.slot = i; });
 buildTabs();
 switchView('all');
 setEditMode(true);
@@ -2143,7 +2131,7 @@ function stickyCard(iss) {
     ${iss.out ? `<div class="meta">成果物：${iss.out}</div>` : ''}
     ${iss.status === 'waiting_approval' && iss.ask ? `<div class="ask">承認待ち：${iss.ask}</div>` : ''}
     ${iss.reportTo && iss.status === 'waiting_review' ? `<div class="meta">報告先：${iss.reportTo.name}</div>` : ''}
-    ${iss.hidden ? `<div class="meta">非表示中</div>` : ''}`;
+    ${iss.hidden ? `<div class=\"meta\">非表示中</div>` : (iss.room && roomHidden(iss.room) ? `<div class=\"meta\">部屋ごと非表示中</div>` : '')}`;
   card.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/plain', String(iss.number));
   });
@@ -2399,6 +2387,7 @@ async function autoRefreshTick() {
     document.getElementById('repoName').textContent = REPO_NAME || 'デモデータ';
     hideErrorBanner();
     normalizeLayouts();
+    if (currentViewKey !== 'all' && currentViewKey !== 'director' && roomHidden(currentViewKey)) currentViewKey = 'all';
     buildTabs();
     switchViewKeepingCamera(currentViewKey);
     if (viewMode === 'board') renderBoard();
