@@ -21,8 +21,8 @@
   .panel.mini .panelBody { display:none; }
   .dot { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
   .lgScope { font-size:11.5px; color:#7d8a8a; margin:3px 0 2px; }
-  .lgRow { display:flex; align-items:center; line-height:1.85; }
-  .lgNum { margin-left:auto; font-weight:700; padding-left:16px; }
+  .lgLine { display:flex; flex-wrap:wrap; gap:2px 14px; align-items:center; line-height:1.7; }
+  .lgItem { display:inline-flex; align-items:center; white-space:nowrap; }
   .hint { position:fixed; right:12px; bottom:10px; font-size:12px; color:#7d8a8a; }
   #tabs {
     position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:8;
@@ -43,14 +43,19 @@
   }
   #detail.open { transform:none; }
   #detail .ttl { font-size:15px; font-weight:700; line-height:1.45; }
-  #detail .row b { display:inline-block; width:58px; color:#7d8a8a; font-weight:600; }
-  #detail .btns { margin-top:10px; display:flex; gap:8px; }
-  #detail .btns a {
-    flex:1; text-align:center; text-decoration:none; font-weight:600;
-    background:#eef3f0; color:#3f4a4a; border-radius:9px; padding:7px 0;
+  #detail .row b { display:inline-block; width:58px; color:#7d8a8a; font-weight:600; font-size:12px; }
+  #detail .btnMain { margin-top:14px; }
+  #detail .btnMain a {
+    display:block; text-align:center; text-decoration:none; font-weight:700;
+    background:#1D76DB; color:#fff; border-radius:8px; padding:10px 0;
   }
-  #detail .btns { flex-wrap:wrap; }
-  #detail .btns a.primary { background:#1D76DB; color:#fff; }
+  #detail .linkRow { margin-top:12px; display:flex; gap:18px; }
+  #detail .linkRow a { color:#1d76db; text-decoration:underline; font-size:13px; font-weight:600; }
+  #detail .mgmtRow { margin-top:16px; border-top:1px solid #e3e8e3; padding-top:10px; }
+  #detail .mgmtRow a { color:#7d8a8a; font-size:12.5px; text-decoration:underline; }
+  #detail .checkLine { margin-top:12px; border-top:1px solid #e3e8e3; padding-top:8px; line-height:1.65; }
+  #detail .checkLine .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
+  #dCheckRec { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   #detail .sec { margin-top:12px; border:1px solid #e3e8e3; border-radius:10px; padding:8px 11px; background:#fbfcfb; line-height:1.65; }
   #detail .sec .secT { font-size:11.5px; font-weight:700; color:#7d8a8a; margin-bottom:2px; }
   #detail .sec.ask { border-color:#f0c6c0; background:#fdf1ef; }
@@ -166,11 +171,11 @@
   .projGroup .cards { display:flex; flex-wrap:wrap; gap:10px; }
   .projGroup .sticky { width:230px; margin-bottom:0; }
   #boardScroll { flex:1; overflow:auto; margin-left:336px; transition:margin-left .28s ease; }
-  #repoBar { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:12px; color:#7d8a8a; }
-  #repoBar #repoName { font-weight:600; word-break:break-all; }
+  #repoBar { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:12px; color:#7d8a8a; flex-wrap:nowrap; }
+  #repoBar #repoName { font-weight:600; font-size:11px; color:#7d8a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   #refreshBtn {
-    border:none; cursor:pointer; background:#eef3f0; color:#3f4a4a;
-    border-radius:8px; padding:3px 10px; font-size:12px; font-weight:600; flex:none;
+    border:none; cursor:pointer; background:none; color:#1d76db;
+    padding:0; font-size:11.5px; font-weight:600; flex:none; text-decoration:underline;
   }
   #errBanner {
     position:fixed; top:60px; left:50%; transform:translateX(-50%); z-index:20;
@@ -252,11 +257,11 @@
 <div class="panel" id="infoPanel">
   <div class="panelHead"><b>TinyCompany</b><button id="panelToggle" title="パネルを畳む／開く">－</button></div>
   <div class="panelBody">
-  <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">🔄 再取得</button><span id="updatedAt" style="margin-left:8px;color:#8a938e;font-size:11px"></span></div>
+  <div id="repoBar"><span id="repoName">デモデータ</span><button id="refreshBtn">再取得</button><span id="updatedAt" style="color:#8a938e;font-size:11px;flex:none"></span></div>
   <div id="legend"></div>
   <div id="modeToggle">
-    <button id="mode3d" class="on">🏢 3D</button>
-    <button id="modeBoard">📌 付箋一覧</button>
+    <button id="mode3d" class="on">3D</button>
+    <button id="modeBoard">付箋一覧</button>
   </div>
   </div>
 </div>
@@ -279,14 +284,15 @@
   <div class="row" id="dProgRow" style="display:none"><b>子Issue</b><span id="dProg"></span></div>
   <div class="row"><b>成果物</b><span id="dOut"></span></div>
   <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
-  <div class="sec" id="dReportSec" style="display:none"><div class="secT">報告</div><div id="dReport"></div><div class="secSub" id="dReportTo"></div></div>
-  <div class="sec" id="dCheckSec" style="display:none"><div class="secT" id="dCheckT">一次確認</div><div id="dCheckRec"></div><div id="dCheckCon"></div></div>
-  <div class="btns">
-    <a href="#" id="dIssue">Issueを開く</a>
-    <a href="#" id="dChat">チャットを開く</a>
-    <a href="#" id="dParentChat" style="display:none">報告先のチャットを開く</a>
-    <a href="#" id="dHideBtn" style="display:none">キャラを隠す</a>
+  <div class="checkLine" id="dCheckSec" style="display:none"><div class="secT" id="dCheckT">一次確認</div><div id="dCheckRec"></div></div>
+  <div class="btnMain" id="dMainRow" style="display:none">
+    <a href="#" id="dParentChat">報告先のチャットを開く</a>
   </div>
+  <div class="linkRow">
+    <a href="#" id="dIssue">Issueを開く</a>
+    <a href="#" id="dChat" style="display:none">チャットを開く</a>
+  </div>
+  <div class="mgmtRow" id="dMgmtRow" style="display:none"><a href="#" id="dHideBtn">キャラを隠す</a></div>
 </div>
 
 <div id="settings">
@@ -647,24 +653,23 @@ function rbox(w, h, d, color, x, y, z, r = 0.04, parent = scene) {
   parent.add(m);
   return m;
 }
-function plateSprite(name, title, gold = false) {
-  const cv = document.createElement('canvas'); cv.width = 880; cv.height = 256;
+function plateSprite(name, gold = false) {
+  const cv = document.createElement('canvas'); cv.width = 880; cv.height = 168;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = gold ? 'rgba(255,246,220,0.97)' : 'rgba(255,255,255,0.96)';
-  ctx.beginPath(); ctx.roundRect(8, 12, 864, 232, 52); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(8, 10, 864, 148, 44); ctx.fill();
   if (gold) { ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 10; ctx.stroke(); }
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#57482c';
-  ctx.font = '600 58px system-ui, sans-serif';
-  ctx.fillText(name == null ? '' : String(name), 440, 84);
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#26322f';
-  let fs = 84;
+  const nm = name == null ? '' : String(name);
+  let fs = 76;
   ctx.font = `700 ${fs}px system-ui, sans-serif`;
-  while (ctx.measureText(title).width > 800 && fs > 48) { fs -= 6; ctx.font = `700 ${fs}px system-ui, sans-serif`; }
-  ctx.fillText(title, 440, 188);
+  while (ctx.measureText(nm).width > 800 && fs > 44) { fs -= 6; ctx.font = `700 ${fs}px system-ui, sans-serif`; }
+  ctx.fillText(nm, 440, 86);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sp.scale.set(1.95, 0.57, 1);
+  sp.scale.set(1.7, 0.325, 1);
   return sp;
 }
 function textSprite(text, scale = 1) {
@@ -777,7 +782,7 @@ function person(parent, x, z, rotY, issue) {
   headG.add(head);
   const closedFig = issue.state === 'closed';
   const stDef = info.status ? SETTINGS.statuses[info.status] : null;
-  const capColor = closedFig ? 0x6B7280 : (stDef ? stDef.color : null);
+  const capColor = closedFig ? SETTINGS.statuses.not_started.color : (stDef ? stDef.color : null);
   if (capColor !== null) {
     const cap = new THREE.Mesh(
       new THREE.SphereGeometry(0.185, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(capColor, 0.7));
@@ -787,7 +792,7 @@ function person(parent, x, z, rotY, issue) {
     headG.add(cap, brim);
   }
   g.add(headG);
-  const plate = plateSprite(info.name, info.title, info.role === 'director');
+  const plate = plateSprite(info.name, info.role === 'director');
   plate.position.set(0, 1.52, 0);
   g.add(plate);
   const poseStatus = closedFig ? null : info.status;
@@ -1180,12 +1185,18 @@ function renderLegend() {
     if (!i.status) continue; // status が無い Issue（社長など）は人数に数えない
     counts[i.status] = (counts[i.status] || 0) + 1;
   }
+  const hexOfSt = st => '#' + st.color.toString(16).padStart(6, '0');
+  const parts = [];
+  for (const [key, st] of Object.entries(SETTINGS.statuses)) {
+    const c = counts[key] || 0;
+    if (c) parts.push(`<span class="lgItem"><span class="dot" style="background:${hexOfSt(st)}"></span>${st.display} ${c}人</span>`);
+  }
+  if (doneCount) {
+    const ns = SETTINGS.statuses.not_started;
+    parts.push(`<span class="lgItem"><span class="dot" style="background:${ns ? hexOfSt(ns) : '#9AA5A0'}"></span>完了 ${doneCount}人</span>`);
+  }
   legendEl.innerHTML = `<div class="lgScope">${scopeName}の人数</div>` +
-    Object.entries(SETTINGS.statuses).map(([key, st]) => {
-      const hex = '#' + st.color.toString(16).padStart(6, '0');
-      return `<div class="lgRow"><span class="dot" style="background:${hex}"></span>${st.display}<span class="lgNum">${counts[key] || 0}人</span></div>`;
-    }).join('') +
-    `<div class="lgRow"><span class="dot" style="background:#6B7280"></span>完了<span class="lgNum">${doneCount}人</span></div>`;
+    `<div class="lgLine">${parts.join('') || 'なし'}</div>`;
 }
 function switchView(key) {
   if (editMode) setEditMode(false);
@@ -1276,8 +1287,10 @@ function showDetail(info, anchorWorld) {
   const dStatusEl = document.getElementById('dStatus');
   const issForState = issueByNum(info.number);
   const isClosed = !!(issForState && issForState.state === 'closed');
+  const nsSt = SETTINGS.statuses.not_started;
+  const nsHex = nsSt ? '#' + nsSt.color.toString(16).padStart(6, '0') : '#9AA5A0';
   if (isClosed) {
-    dStatusEl.innerHTML = '<span class="dot" style="background:#6B7280"></span>完了（クローズ）';
+    dStatusEl.innerHTML = `<span class="dot" style="background:${nsHex}"></span>完了（クローズ）`;
   } else if (st) {
     const hex = '#' + st.color.toString(16).padStart(6, '0');
     dStatusEl.innerHTML =
@@ -1309,33 +1322,38 @@ function showDetail(info, anchorWorld) {
   document.getElementById('dUpdated').textContent =
     issue && issue.updatedAt ? fmtUpdated(issue.updatedAt) : '—';
   const pcBtn = document.getElementById('dParentChat');
+  const mainRow = document.getElementById('dMainRow');
   const pIssue2 = issue && issue.parent ? issueByNum(issue.parent) : null;
   const rtChat = issue && issue.reportTo && issue.reportTo.chat ? issue.reportTo.chat : null;
   const pChat = pIssue2 && pIssue2.chat && pIssue2.chat.url ? pIssue2.chat.url : null;
   const targetChat = rtChat || pChat;
-  if (targetChat && issue) {
-    pcBtn.style.display = '';
+  if (targetChat && issue && info.status === 'waiting_review' && !isClosed) {
+    mainRow.style.display = '';
     pcBtn.dataset.url = targetChat;
-    pcBtn.dataset.copy = info.status === 'waiting_review' && !isClosed
-      ? `Issue #${issue.number}「${issue.title}」の作業が完了しました。報告書を確認してください。`
-      : `Issue #${issue.number}「${issue.title}」について連絡します。`;
-    pcBtn.classList.toggle('primary', info.status === 'waiting_review' && !isClosed);
-    pcBtn.textContent = '報告先のチャットを開く';
+    pcBtn.dataset.copy = `Issue #${issue.number}「${issue.title}」の作業が完了しました。報告書を確認してください。`;
   } else {
-    pcBtn.style.display = 'none';
+    mainRow.style.display = 'none';
     delete pcBtn.dataset.url;
   }
   const hideBtn = document.getElementById('dHideBtn');
+  const mgmtRow = document.getElementById('dMgmtRow');
   const ghCfg = window.TCGitHub && TCGitHub.getConfig && TCGitHub.getConfig();
+  let showMgmt = false;
   if (issue && ghCfg && TCGitHub.setIssueHidden) {
-    hideBtn.textContent = issue.hidden ? 'キャラを表示に戻す' : 'キャラを隠す';
-    hideBtn.dataset.num = issue.number;
-    hideBtn.dataset.hidden = issue.hidden ? '1' : '';
-    hideBtn.style.display = '';
-  } else {
-    hideBtn.style.display = 'none';
-    delete hideBtn.dataset.num;
+    if (issue.hidden) {
+      hideBtn.textContent = issue.bucho ? '部屋を表示に戻す' : 'キャラを表示に戻す';
+      showMgmt = true;
+    } else if (isClosed) {
+      hideBtn.textContent = issue.bucho ? '部屋を非表示にする' : 'キャラを隠す';
+      showMgmt = true;
+    }
+    if (showMgmt) {
+      hideBtn.dataset.num = issue.number;
+      hideBtn.dataset.hidden = issue.hidden ? '1' : '';
+    }
   }
+  mgmtRow.style.display = showMgmt ? '' : 'none';
+  if (!showMgmt) delete hideBtn.dataset.num;
   const asec = document.getElementById('dAskSec');
   if (info.ask && info.status === 'waiting_approval' && !isClosed) {
     asec.style.display = '';
@@ -1343,34 +1361,15 @@ function showDetail(info, anchorWorld) {
   } else {
     asec.style.display = 'none';
   }
-  const rsec = document.getElementById('dReportSec');
-  if (issue && issue.reportText) {
-    rsec.style.display = '';
-    document.getElementById('dReport').textContent = issue.reportText;
-    const rtEl = document.getElementById('dReportTo');
-    rtEl.textContent = '';
-    if (issue.reportTo) {
-      rtEl.appendChild(document.createTextNode('報告先：'));
-      if (issue.reportTo.chat) {
-        const a = document.createElement('a');
-        a.href = issue.reportTo.chat; a.target = '_blank'; a.rel = 'noopener';
-        a.className = 'lnk'; a.textContent = issue.reportTo.name;
-        rtEl.appendChild(a);
-      } else {
-        rtEl.appendChild(document.createTextNode(issue.reportTo.name));
-      }
-    }
-  } else {
-    rsec.style.display = 'none';
-  }
   const csec = document.getElementById('dCheckSec');
   if (issue && issue.preCheck) {
     csec.style.display = '';
     document.getElementById('dCheckT').textContent =
       '一次確認（' + (issue.preCheck.by || '上司') + '）';
-    document.getElementById('dCheckRec').textContent = '推奨：' + issue.preCheck.recommend;
-    document.getElementById('dCheckCon').textContent =
-      issue.preCheck.concerns ? '懸念：' + issue.preCheck.concerns : '';
+    const recEl = document.getElementById('dCheckRec');
+    recEl.textContent = '推奨：' + issue.preCheck.recommend;
+    recEl.title = '推奨：' + issue.preCheck.recommend +
+      (issue.preCheck.concerns ? '\n懸念：' + issue.preCheck.concerns : '');
   } else {
     csec.style.display = 'none';
   }
@@ -1389,14 +1388,17 @@ function showDetail(info, anchorWorld) {
     a.href = info.out; a.target = '_blank'; a.rel = 'noopener';
     a.className = 'lnk'; a.textContent = info.out;
     outEl.appendChild(a);
+  } else if (info.out) {
+    outEl.textContent = 'あり';
+    outEl.title = info.out;
   } else {
-    outEl.textContent = info.out || '（未記入）';
+    outEl.textContent = '（未記入）';
   }
 updateChatUI(info);
   openDetail();
   ring.position.set(anchorWorld.x, 0.13, anchorWorld.z);
   ring.scale.setScalar(1);
-  ring.material.color.set(st ? st.color : 0xd9a441);
+  ring.material.color.set(isClosed && nsSt ? nsSt.color : (st ? st.color : 0xd9a441));
   ring.visible = true;
 }
 document.getElementById('detailClose').addEventListener('click', () => {
@@ -1645,7 +1647,7 @@ const chatRow = document.createElement('div');
 chatRow.className = 'row';
 chatRow.style.display = 'none';
 chatRow.innerHTML = '<b>チャット</b><span id="dChatName"></span>';
-detail.insertBefore(chatRow, detail.querySelector('.btns'));
+detail.insertBefore(chatRow, detail.querySelector('.btnMain'));
 const dChatBtn = document.getElementById('dChat');
 function updateChatUI(info) {
 const issue = issueByNum(info.number);
@@ -2098,7 +2100,7 @@ const LANES = [
   { key: 'working', title: '作業中', color: '#0E8A16' },
   { key: 'waiting_approval', title: '承認待ち', color: '#B60205' },
   { key: 'waiting_review', title: '確認待ち', color: '#1D76DB' },
-  { key: 'done', title: '完了', color: '#6B7280' }
+  { key: 'done', title: '完了', color: '#9AA5A0' }
 ];
 const laneOf = iss => iss.state === 'closed' ? 'done' : iss.status;
 function roomColorOf(iss) {
@@ -2127,10 +2129,8 @@ function stickyCard(iss) {
   card.innerHTML = `
     <span class="roomTag" style="background:${roomColorOf(iss)}">${roomNameOf(iss)}</span>
     <div class="ttl">${iss.title}</div>
-    <div class="meta">${iss.assignee || '担当未記入'}（${seatMark}） / #${iss.number}${iss.parent ? ` / 親 #${iss.parent}` : ''}</div>
-    ${iss.out ? `<div class="meta">成果物：${iss.out}</div>` : ''}
+    <div class="meta">${iss.assignee || '担当未記入'}（${seatMark}） / #${iss.number}</div>
     ${iss.status === 'waiting_approval' && iss.ask ? `<div class="ask">承認待ち：${iss.ask}</div>` : ''}
-    ${iss.reportTo && iss.status === 'waiting_review' ? `<div class="meta">報告先：${iss.reportTo.name}</div>` : ''}
     ${iss.hidden ? `<div class=\"meta\">非表示中</div>` : (iss.room && roomHidden(iss.room) ? `<div class=\"meta\">部屋ごと非表示中</div>` : '')}`;
   card.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/plain', String(iss.number));
