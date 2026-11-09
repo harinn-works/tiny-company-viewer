@@ -285,6 +285,7 @@
     <a href="#" id="dIssue">Issueを開く</a>
     <a href="#" id="dChat">チャットを開く</a>
     <a href="#" id="dParentChat" style="display:none">報告先のチャットを開く</a>
+    <a href="#" id="dHideBtn" style="display:none">キャラを隠す</a>
   </div>
 </div>
 
@@ -554,7 +555,7 @@ function ensureLayout(roomId) {
 // layout が無い部屋は ensureLayout が部署「メイン」を合成し、ここで4席の島を必要数だけ足す（契約4）。
 function prepareLayout(roomId) {
   const L = ensureLayout(roomId);
-  const members = ISSUES.filter(i => i.room === roomId && i.state === 'open' && i.seat === 'member');
+  const members = ISSUES.filter(i => i.room === roomId && !i.hidden && i.seat === 'member');
   if (members.length) {
     ensureDepartment(L);
     const seatCount = () => L.islands.reduce((s, isl) => s + (isl.memberSeats || []).length, 0);
@@ -586,7 +587,8 @@ function rootBuchoNum(issue) {
   return top ? top.number : issue.number;
 }
 function resolveRoom(layout, roomId) {
-  const open = ISSUES.filter(i => i.room === roomId && i.state === 'open');
+  // 着席対象：閉じた人も座る（帽子がグレーになる）。「非表示」ラベルの人だけ座らない
+  const open = ISSUES.filter(i => i.room === roomId && !i.hidden);
   const byNum = new Map(open.map(i => [i.number, i]));
   const seats = [];
   for (const isl of layout.islands) {
@@ -772,12 +774,14 @@ function person(parent, x, z, rotY, issue) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.175, 24, 18), mat(0xf4cda3));
   head.castShadow = true;
   headG.add(head);
+  const closedFig = issue.state === 'closed';
   const stDef = info.status ? SETTINGS.statuses[info.status] : null;
-  if (stDef) {
+  const capColor = closedFig ? 0x6B7280 : (stDef ? stDef.color : null);
+  if (capColor !== null) {
     const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.185, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(stDef.color, 0.7));
+      new THREE.SphereGeometry(0.185, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(capColor, 0.7));
     cap.position.y = 0.03; cap.castShadow = true;
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.03, 24), mat(stDef.color, 0.7));
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.03, 24), mat(capColor, 0.7));
     brim.position.set(0, 0.03, -0.1); brim.scale.z = 0.75; brim.castShadow = true;
     headG.add(cap, brim);
   }
@@ -785,16 +789,17 @@ function person(parent, x, z, rotY, issue) {
   const plate = plateSprite(info.name, info.title, info.role === 'director');
   plate.position.set(0, 1.52, 0);
   g.add(plate);
+  const poseStatus = closedFig ? null : info.status;
   let bang = null;
-  if (info.status === 'waiting_approval') {
+  if (poseStatus === 'waiting_approval') {
     bang = bangSprite();
     bang.position.set(0.42, 1.3, 0);
     g.add(bang);
     armR.rotation.x = 2.7;
     armL.rotation.x = 0.85;
-  } else if (info.status === 'working') {
+  } else if (poseStatus === 'working') {
     armL.rotation.x = 1.9; armR.rotation.x = 1.9;
-  } else if (info.status === 'not_started') {
+  } else if (poseStatus === 'not_started') {
     armL.rotation.x = 0.12; armR.rotation.x = 0.12;
   } else {
     armL.rotation.x = 0.5; armR.rotation.x = 0.5;
@@ -806,7 +811,7 @@ function person(parent, x, z, rotY, issue) {
   g.userData.anchorGroup = parent;
   parent.add(g);
   clickables.push(g);
-  animated.push({ armL, armR, headG, bang, root: g, kind: info.status, phase: Math.random() * Math.PI * 2 });
+  animated.push({ armL, armR, headG, bang, root: g, kind: poseStatus, phase: Math.random() * Math.PI * 2 });
   return g;
 }
 function seatSolo(parent, x, z, rotY, issue) {
@@ -910,7 +915,7 @@ function buildRoomContents(parent, effLayout, roomId, furniture = true) {
   for (const isl of effLayout.islands) {
     buildIsland(parent, isl, seats.filter(s => s.isl === isl));
   }
-  const bucho = ISSUES.find(i => i.room === roomId && i.bucho && i.state === 'open');
+  const bucho = ISSUES.find(i => i.room === roomId && i.bucho && !i.hidden);
   if (bucho) {
     const W = effLayout.size.w, D = effLayout.size.d;
     const rectDist = (a, b) => {
@@ -966,8 +971,8 @@ function buildDirector(parent, furniture = true) {
   mg.position.set(0, 0.72, -2.55); mg.rotation.y = Math.PI;
   parent.add(mg);
   monitor(mg, 0, 0.04, -0.08);
-  if (issue && issue.state === 'open') person(parent, 0, -3.3, Math.PI, issue);
-  const sec = ISSUES.find(i => i.seat === 'secretary' && i.state === 'open');
+  if (issue && !issue.hidden) person(parent, 0, -3.3, Math.PI, issue);
+  const sec = ISSUES.find(i => i.seat === 'secretary' && !i.hidden);
   if (sec) seatSolo(parent, 2.05, -1.1, Math.PI / 2, sec);
   if (!furniture) return;
   rbox(3.6, 0.08, 1.3, 0xf4f5f3, 0, 0.66, 0.6, 0.03, parent);
@@ -1156,8 +1161,10 @@ function renderLegend() {
     : currentViewKey === 'director' ? ISSUES.filter(i => i.room === null)
     : ISSUES.filter(i => i.room === currentViewKey);
   const counts = {};
+  let doneCount = 0;
   for (const i of scoped) {
-    if (i.state !== 'open') continue;
+    if (i.hidden) continue;
+    if (i.state === 'closed') { doneCount++; continue; }
     if (!i.status) continue; // status が無い Issue（社長など）は人数に数えない
     counts[i.status] = (counts[i.status] || 0) + 1;
   }
@@ -1165,7 +1172,8 @@ function renderLegend() {
     Object.entries(SETTINGS.statuses).map(([key, st]) => {
       const hex = '#' + st.color.toString(16).padStart(6, '0');
       return `<div class="lgRow"><span class="dot" style="background:${hex}"></span>${st.display}<span class="lgNum">${counts[key] || 0}人</span></div>`;
-    }).join('');
+    }).join('') +
+    `<div class="lgRow"><span class="dot" style="background:#6B7280"></span>完了<span class="lgNum">${doneCount}人</span></div>`;
 }
 function switchView(key) {
   if (editMode) setEditMode(false);
@@ -1304,6 +1312,17 @@ function showDetail(info, anchorWorld) {
   } else {
     pcBtn.style.display = 'none';
     delete pcBtn.dataset.url;
+  }
+  const hideBtn = document.getElementById('dHideBtn');
+  const ghCfg = window.TCGitHub && TCGitHub.getConfig && TCGitHub.getConfig();
+  if (issue && ghCfg && TCGitHub.setIssueHidden) {
+    hideBtn.textContent = issue.hidden ? 'キャラを表示に戻す' : 'キャラを隠す';
+    hideBtn.dataset.num = issue.number;
+    hideBtn.dataset.hidden = issue.hidden ? '1' : '';
+    hideBtn.style.display = '';
+  } else {
+    hideBtn.style.display = 'none';
+    delete hideBtn.dataset.num;
   }
   const asec = document.getElementById('dAskSec');
   if (info.ask && info.status === 'waiting_approval' && !isClosed) {
@@ -1585,6 +1604,25 @@ document.getElementById('dParentChat').addEventListener('click', async e => {
   window.open(url, '_blank', 'noopener');
   btn.textContent = '開きました（依頼文コピー済み）';
   setTimeout(() => { btn.textContent = '報告先のチャットを開く'; }, 1800);
+});
+
+// キャラの表示・非表示（「非表示」ラベルの付け外し）
+document.getElementById('dHideBtn').addEventListener('click', async e => {
+  e.preventDefault();
+  const btn = e.currentTarget;
+  const num = Number(btn.dataset.num);
+  if (!num || !window.TCGitHub || !TCGitHub.setIssueHidden) return;
+  const cfg = TCGitHub.getConfig();
+  if (!cfg) return;
+  const toHide = !btn.dataset.hidden;
+  const old = btn.textContent;
+  btn.textContent = '切り替え中…';
+  try {
+    await TCGitHub.setIssueHidden(cfg, num, toHide);
+    await autoRefreshTick();
+  } catch (_) {
+    btn.textContent = old;
+  }
 });
 
 // チャット参照（構造化）: URLがある場合だけボタンを出す
@@ -2104,7 +2142,8 @@ function stickyCard(iss) {
     <div class="meta">${iss.assignee || '担当未記入'}（${seatMark}） / #${iss.number}${iss.parent ? ` / 親 #${iss.parent}` : ''}</div>
     ${iss.out ? `<div class="meta">成果物：${iss.out}</div>` : ''}
     ${iss.status === 'waiting_approval' && iss.ask ? `<div class="ask">承認待ち：${iss.ask}</div>` : ''}
-    ${iss.reportTo && iss.status === 'waiting_review' ? `<div class="meta">報告先：${iss.reportTo.name}</div>` : ''}`;
+    ${iss.reportTo && iss.status === 'waiting_review' ? `<div class="meta">報告先：${iss.reportTo.name}</div>` : ''}
+    ${iss.hidden ? `<div class="meta">非表示中</div>` : ''}`;
   card.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/plain', String(iss.number));
   });
@@ -2362,6 +2401,7 @@ async function autoRefreshTick() {
     normalizeLayouts();
     buildTabs();
     switchViewKeepingCamera(currentViewKey);
+    if (viewMode === 'board') renderBoard();
     if (openNum) {
       const iss = ISSUES.find(i => i.number === openNum);
       if (iss) showDetail(infoOf(iss), { x: 0, z: 0 });
