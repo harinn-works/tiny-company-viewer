@@ -35,11 +35,13 @@
     if (!r.ok) throw new Error(`GitHub GET ${pathname} -> ${r.status}`);
     return r.json();
   }
-  // 一覧 API の全ページ取得。per_page の上限（100件）を超える分は Link ヘッダの
-  // rel="next" を辿って逐次取得し、取得順のまま結合する（件数に上限を設けない）。
-  // 取得の合間に新規 Issue が作られるとページ境界がずれて同じ Issue が2ページに
-  // 現れうるため、番号で重複を取り除く。途中のページが失敗したら、部分データで
-  // 描画せず例外を投げて呼び出し側のエラー経路に倒す。
+  // 一覧 API の全ページ取得（Issue 一覧と Issue のコメントで共用）。per_page の
+  // 上限（100件）を超える分は Link ヘッダの rel="next" を辿って逐次取得し、
+  // 取得順のまま結合する（件数に上限を設けない）。
+  // 取得の合間に新規 Issue やコメントが作られるとページ境界がずれて同じ項目が
+  // 2ページに現れうるため、重複を取り除く（キーは Issue は番号、コメントは
+  // 番号を持たないので id）。途中のページが失敗したら、部分データで描画せず
+  // 例外を投げて呼び出し側のエラー経路に倒す。
   async function ghJsonAllPages(cfg, pathname) {
     const perPage = 100;
     const sep = pathname.includes('?') ? '&' : '?';
@@ -51,9 +53,12 @@
       const items = await r.json();
       let added = 0;
       for (const it of items) {
-        if (it && typeof it.number === 'number') {
-          if (seen.has(it.number)) continue;
-          seen.add(it.number);
+        const key = it && typeof it.number === 'number' ? 'n:' + it.number
+          : it && typeof it.id === 'number' ? 'i:' + it.id
+          : null;
+        if (key !== null) {
+          if (seen.has(key)) continue;
+          seen.add(key);
         }
         out.push(it);
         added++;
@@ -273,7 +278,10 @@
     });
     const preChecks = await mapPool(provisional, 6, async p => {
       if (p.status !== 'waiting_review') return null;
-      const comments = await ghJson(cfg, `/repos/${cfg.repo}/issues/${p.iss.number}/comments?per_page=100`);
+      // 一次確認は「一次確認を含む最新のコメント」が対象（parsePreCheck）。コメントが
+      // 100件を超える Issue では最新の一次確認が先頭ページに無いため、Issue 本体と
+      // 同様に全ページ取得する（#56）。
+      const comments = await ghJsonAllPages(cfg, `/repos/${cfg.repo}/issues/${p.iss.number}/comments?per_page=100`);
       return parsePreCheck(comments);
     });
 
