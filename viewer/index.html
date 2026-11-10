@@ -198,6 +198,10 @@
     padding:8px 16px; border-radius:10px; font-size:13px; display:none;
     box-shadow:0 2px 10px rgba(0,0,0,.1); max-width:92vw;
   }
+  #errBanner button {
+    margin-left:10px; border:1px solid #356A59; background:#fff; color:#356A59;
+    border-radius:8px; padding:2px 12px; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
   #toast {
     position:fixed; bottom:26px; left:50%; transform:translateX(-50%); z-index:30;
     background:rgba(63,74,74,.94); color:#fff; padding:8px 18px; border-radius:999px;
@@ -327,14 +331,14 @@
   <div class="ttl">設定</div>
   <div id="settingsBody"></div>
   <div class="btns">
-    <button id="settingsSave">settings.json保存</button>
+    <button id="settingsSave">設定を保存</button>
   </div>
   <div id="connBox">
     <div class="ttl2">接続先</div>
     <div id="connInfo">未接続（デモデータを表示中）</div>
     <button id="connChange">接続を変更する</button>
   </div>
-  <div class="note">変更は凡例へすぐ、3D表示へは少し遅れて反映されます。「settings.json保存」で接続先のリポジトリの board/settings.json に保存されます（失敗した場合はダウンロードになります）。ラベル名そのものは意味キーとして固定です。</div>
+  <div class="note">変更は凡例へすぐ、3D表示へは少し遅れて反映されます。「設定を保存」で、接続先のリポジトリにある会社の設定ファイル（board/settings.json）に保存されます（失敗した場合はダウンロードになります）。ラベル名そのものは意味キーとして固定です。</div>
 </div>
 
 <script src="./github.js"></script>
@@ -431,13 +435,12 @@ let LAYOUTS = {
   }
 };
 let ISSUES = [
-  { number: 101, title: '全体の進行管理', assignee: 'ChatGPT', seat: 'director', room: null, status: 'working', state: 'open', parent: null, out: '（管理Issueで集約）', ask: null },
+  { number: 101, title: '全体の進行管理', assignee: 'ChatGPT', seat: 'director', room: null, status: null, state: 'open', parent: null, out: '（管理Issueで集約）', ask: null },
   { number: 31, title: '情報収集の統括', assignee: 'ChatGPT', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: null, out: '（管理Issue）', ask: null },
   { number: 32, title: '競合LPの調査', assignee: 'Muse', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 31, out: 'work/research.md', ask: null },
   { number: 33, title: '口コミ収集', assignee: 'Codex', seat: 'member', room: 'lp', status: 'waiting_review', state: 'closed', parent: 31, out: 'work/reviews.md', ask: null },
   { number: 35, title: '文章チームの管理', assignee: 'Muse', seat: 'bucho', bucho: true, room: 'lp', status: 'waiting_review', state: 'open', parent: null, out: '（管理Issue）', ask: null,
-    reportTo: { name: 'ChatGPT（総監督）', chat: 'https://chatgpt.com/' },
-    reportText: '【報告】文章チームの管理：LP本文の執筆（work/lp-body.md）と見出し案（work/headlines.md）が揃いました。全体の進行確認をお願いします。' },
+    reportTo: { name: 'ChatGPT（総監督）', chat: 'https://chatgpt.com/' } },
   { number: 36, title: 'LP本文の執筆', assignee: 'ChatGPT', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 35, out: 'work/lp-body.md', ask: null,
     chat: { label: 'ChatGPT（LP制作の会話）', url: 'https://chatgpt.com/' } },
   { number: 37, title: '見出し案の作成', assignee: 'Codex', seat: 'member', room: 'lp', status: 'working', state: 'open', parent: 35, out: 'work/headlines.md', ask: null },
@@ -450,12 +453,11 @@ let ISSUES = [
   { number: 53, title: '調査の管理', assignee: 'Muse', seat: 'bucho', bucho: true, room: 'housetodo', status: 'working', state: 'open', parent: null, out: '（管理Issue）', ask: null },
   { number: 54, title: 'MCP仕様の調査', assignee: 'ChatGPT', seat: 'member', room: 'housetodo', status: 'waiting_review', state: 'open', parent: 53, out: 'work/mcp-notes.md', ask: null,
     reportTo: { name: 'Muse（親：調査の管理）', chat: '' },
-    reportText: '【報告】MCP仕様の調査が完了しました。成果物：rooms/housetodo/work/mcp-notes.md。要点は認証方式とツール一覧です。確認をお願いします。',
     preCheck: { by: 'Muse（部長）', recommend: '報告書（work/mcp-notes.md）を確認。要点が認証方式とツール一覧に整理されており、最終確認へ回して問題なし', concerns: 'ツール一覧の網羅性は、公式ドキュメントとの突き合わせまではしていない' },
     chat: { label: 'Muse サイドチャット「開発：エージェント作業ボード」', url: 'https://muse.ai/' } },
   { number: 61, title: '単発の相談（献立どうする）', assignee: 'Muse', seat: 'member', room: 'free', status: 'working', state: 'open', parent: null, out: null, ask: null,
     chat: { label: 'Muse メインチャット' } },
-  { number: 102, title: '秘書・伝令', assignee: 'Muse', seat: 'secretary', room: null, status: 'working', state: 'open', parent: 101, out: '（伝令）', ask: null },
+  { number: 102, title: '秘書・伝令', assignee: 'Muse', seat: 'secretary', room: null, status: null, state: 'open', parent: 101, out: '（伝令）', ask: null },
   { number: 62, title: '旧ポートフォリオの管理', assignee: 'Muse', seat: 'bucho', bucho: true, room: 'old-portfolio', status: 'waiting_review', state: 'closed', parent: null, out: '（管理Issue）', ask: null, hidden: true }
 ];
 let SETTINGS_RAW = null; // サーバー取得した settings.json の生データ（保存時のマージ用）
@@ -2058,15 +2060,15 @@ mkBtn('⟳ 回転（島）', () => { if (selected && selected.userData.isIsland)
 mkBtn('🗑 削除（島・机）', deleteSelectedIsland),
 mkBtn('🗑 部署を削除（選択中）', deleteSelectedDepartment),
 mkBtn('✨ 自動整列', autoArrange),
-mkBtn('layout.json保存', saveLayout)
+mkBtn('レイアウトを保存', saveLayout)
 );
 note.textContent = '島・部署エリアをドラッグで移動。部署の角の■を引くと大きさ変更。動かしたものは手動配置として保持されます';
 } else if (currentViewKey === 'all') {
 editbar.append(
 mkBtn('＋ 部屋を追加', addRoom),
-mkBtn('building.json保存', saveBuilding)
+mkBtn('配置を保存', saveBuilding)
 );
-note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります';
+note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります。編集モードでは、非表示の部屋も含めて全部表示されます';
 }
 editbar.appendChild(note);
 }
@@ -2342,9 +2344,17 @@ el.classList.add('show');
 clearTimeout(toastTimer);
 toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
-function showErrorBanner(msg) {
+function showErrorBanner(msg, opts) {
 const el = document.getElementById('errBanner');
 el.textContent = msg;
+if (opts && opts.connect) {
+// 未接続（デモ表示）の間は、バナーから直接接続モーダルへ進める導線を出す
+const b = document.createElement('button');
+b.type = 'button';
+b.textContent = '接続する';
+b.addEventListener('click', openConnect);
+el.appendChild(b);
+}
 el.style.display = 'block';
 }
 function hideErrorBanner() {
@@ -2877,7 +2887,14 @@ document.getElementById('connConnect').addEventListener('click', async () => {
     document.getElementById('connToken').value = '';
     await refreshData();
   } catch (e) {
-    errEl.textContent = '接続できませんでした。リポジトリ名とトークンを確認してください。（' + (e && e.message ? e.message : e) + '）';
+    // 失敗の種類ごとに、次に確認すべき点を案内する（生のエラー文は出さない）
+    const msgs = {
+      repo: 'リポジトリが見つかりません。リポジトリ名が「owner/name」の形になっているか、トークンに対象リポジトリへのアクセス権があるかを確認してください。',
+      token: 'トークンが無効です。トークンの値が正しいか、有効期限が切れていないかを確認してください。',
+      network: '通信できませんでした。ネットワーク接続を確認して、もう一度お試しください。',
+      nosettings: 'リポジトリは見つかりましたが、会社の設定ファイル（board/settings.json）がありません。会社リポジトリかどうかを確認してください。'
+    };
+    errEl.textContent = msgs[e && e.kind] || '接続できませんでした。リポジトリ名・トークン・ネットワークを確認してください。';
     errEl.style.display = 'block';
   } finally {
     btn.disabled = false;
@@ -2894,7 +2911,8 @@ document.getElementById('connConnect').addEventListener('click', async () => {
   } catch (e) {
     showErrorBanner(hasCfg
       ? '会社データを取得できませんでした。デモデータを表示しています。接続先は設定から変更できます。'
-      : '会社に接続すると、あなたの会社のボードが表示されます。今はデモデータを表示しています。');
+      : '会社に接続すると、あなたの会社のボードが表示されます。今はデモデータを表示しています。',
+      { connect: !hasCfg });
   }
   document.getElementById('repoName').textContent = live && REPO_NAME ? REPO_NAME : 'デモデータ';
   updateConnInfo();
