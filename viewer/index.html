@@ -226,6 +226,14 @@
   #connConnect { background:#356A59; color:#fff; }
   #connCancel { background:#eef3f0; color:#273A34; }
   #connError { color:#b60205; margin-top:10px; display:none; }
+  .keyImport { margin-top:14px; }
+  #connKeyLabel {
+    display:inline-block; margin:0; cursor:pointer; background:#eef3f0; color:#273A34;
+    border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600;
+  }
+  #connKeyFile { position:absolute; width:1px; height:1px; opacity:0; }
+  .keyImportHint { color:#7d8a8a; font-size:12px; margin:6px 0 0; line-height:1.6; font-weight:400; }
+  #connKeyMsg { color:#356A59; margin-top:8px; display:none; }
   .connectHelp { color:#7d8a8a; font-size:12px; margin-top:14px; line-height:1.6; }
   #connBox { border-top:1px solid #E3E9E4; margin-top:14px; padding-top:12px; }
   #connBox .ttl2 { font-weight:700; margin-bottom:4px; }
@@ -252,6 +260,11 @@
   <div class="connectCard">
     <div class="ttl">会社に接続する</div>
     <p>会社リポジトリ（GitHub）と、そのリポジトリ専用のトークンを入力してください。トークンはこのブラウザの中にだけ保存されます。</p>
+    <div class="keyImport">
+      <label id="connKeyLabel">鍵ファイルから取り込む<input id="connKeyFile" type="file" accept=".txt,.json,text/plain,application/json"></label>
+      <p class="keyImportHint">会社の鍵ファイルを選ぶと、下の欄に自動で入ります。鍵ファイルは、トークンだけを書いたテキストファイル、または {"token": "...", "repo": "owner/repository"} の形の JSON ファイルです。</p>
+      <div id="connKeyMsg"></div>
+    </div>
     <label>会社リポジトリ<input id="connRepo" placeholder="owner/repository" autocomplete="off"></label>
     <label>トークン<input id="connToken" type="password" placeholder="github_pat_..." autocomplete="off"></label>
     <details>
@@ -263,7 +276,7 @@
       <button id="connConnect">接続する</button>
       <button id="connCancel">あとで</button>
     </div>
-    <p class="connectHelp">トークンの作り方：GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で、対象の会社リポジトリだけを選び、Repository permissions の Issues と Contents を Read and write にします。PC ごとにトークンを分けると、不要になった PC の分だけを消せて安全です。</p>
+    <p class="connectHelp">トークンの作り方：GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で、対象の会社リポジトリだけを選び、Repository permissions の Issues と Contents を Read and write にします。トークンは「会社の鍵」として1本だけ作り、鍵ファイル（tinycompany-token）に保存して、他の道具とも使い回します。鍵ファイルを選んで取り込むと、下の欄に入ります。</p>
   </div>
 </div>
 <div class="panel" id="infoPanel">
@@ -2761,9 +2774,54 @@ function openConnect() {
     document.getElementById('connApi').value = cfg.apiBase && cfg.apiBase !== 'https://api.github.com' ? cfg.apiBase : '';
   }
   document.getElementById('connError').style.display = 'none';
+  const km = document.getElementById('connKeyMsg');
+  if (km) { km.textContent = ''; km.style.display = 'none'; }
   connectOverlay.classList.add('open');
 }
 function closeConnect() { connectOverlay.classList.remove('open'); }
+function showConnError(msg) {
+  const errEl = document.getElementById('connError');
+  errEl.textContent = msg;
+  errEl.style.display = 'block';
+}
+const KEY_FILE_HINT = '鍵ファイルの形式が解釈できませんでした。トークンだけを書いたテキストファイル、または {"token": "...", "repo": "owner/repository"} の JSON ファイルを使ってください。';
+function applyKeyFileText(text) {
+  const errEl = document.getElementById('connError');
+  const msgEl = document.getElementById('connKeyMsg');
+  msgEl.textContent = '';
+  msgEl.style.display = 'none';
+  const t = (text || '').trim();
+  if (!t) { showConnError('鍵ファイルが空でした。ファイルを確認してください。'); return; }
+  const setFields = (token, repo) => {
+    document.getElementById('connToken').value = token;
+    if (repo) document.getElementById('connRepo').value = repo;
+    errEl.style.display = 'none';
+    msgEl.textContent = '鍵ファイルから取り込みました。内容を確認して「接続する」を押してください。';
+    msgEl.style.display = 'block';
+  };
+  if (t.startsWith('{')) {
+    let obj = null;
+    try { obj = JSON.parse(t); } catch (e) { obj = null; }
+    if (obj && typeof obj.token === 'string' && obj.token.trim()) {
+      setFields(obj.token.trim(), typeof obj.repo === 'string' ? obj.repo.trim() : '');
+      return;
+    }
+    showConnError(KEY_FILE_HINT);
+    return;
+  }
+  if (/\s/.test(t)) { showConnError(KEY_FILE_HINT); return; }
+  setFields(t, '');
+}
+document.getElementById('connKeyFile').addEventListener('change', async (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  try {
+    applyKeyFileText(await f.text());
+  } catch (e) {
+    showConnError('鍵ファイルを読み込めませんでした。（' + (e && e.message ? e.message : e) + '）');
+  }
+});
 document.getElementById('connCancel').addEventListener('click', closeConnect);
 document.getElementById('connChange').addEventListener('click', openConnect);
 document.getElementById('connConnect').addEventListener('click', async () => {
