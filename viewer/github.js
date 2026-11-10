@@ -91,7 +91,9 @@
         if (fields[current] === undefined) fields[current] = '';
         continue;
       }
-      if (line.startsWith('#')) {
+      if (/^#{1,6}(\s|$)/.test(line)) {
+        // 見出し行で節を区切る。ただし「#16 の子」のような Issue 参照は見出しではない
+        // （# の直後に数字が続く）ので、値として現在の項目へ取り込む（親の宣言がこの形）
         current = null;
       } else if (current) {
         fields[current] = (fields[current] + '\n' + line).trim();
@@ -161,16 +163,13 @@
     const raw = await ghJson(cfg, `/repos/${cfg.repo}/issues?state=all&per_page=100`);
     const list = raw.filter(i => !i.pull_request);
 
+    // サブIssueリンクの親。階層の正ではなくなったが、本文の「親」宣言が無い
+    // Issue への移行の橋渡しとして使うため、取得自体は残す（設計B、#46）。
     const parents = await mapPool(list, 6, async iss => {
       const r = await gh(cfg, `/repos/${cfg.repo}/issues/${iss.number}/parent`);
       if (!r.ok) return null;
       const j = await r.json();
       return j && j.number ? j.number : null;
-    });
-    const childrenOf = {};
-    list.forEach((iss, i) => {
-      const p = parents[i];
-      if (p) (childrenOf[p] = childrenOf[p] || []).push(iss.number);
     });
 
     const roomPrefix = (settings.labelPrefixes && settings.labelPrefixes.room) || 'room:';
@@ -191,6 +190,63 @@
       };
     });
 
+    // ---------- 親子の解決：正は本文の「親」宣言（設計B、#46） ----------
+    // 宣言（「## 親」の節／「親：#N」の行）にある最初の #番号が親になる。
+    // 宣言が実リンクと食い違ったら宣言が勝つ。宣言先が存在しない・別部屋
+    // （room が子と異なる）・循環しているときは、その親子関係は無効（親なし）
+    // として扱い、理由を parentNote に残す（表示は詳細パネルの親の行だけ）。
+    // 宣言が無い Issue に限り、橋渡しとしてサブIssueリンクの親を使い、
+    // その場合は「リンクのみ（宣言なし）」の注記を残す。
+    const fieldsList = provisional.map(p => parseBody(p.iss.body || ''));
+    const declaredOf = f => {
+      const t = f['親'];
+      if (!t) return null;
+      const m = String(t).match(/#(\d+)/);
+      return m ? Number(m[1]) : null;
+    };
+    const idxByNum = new Map(provisional.map((p, i) => [p.iss.number, i]));
+    const resolvedParent = new Array(provisional.length).fill(null);
+    const parentNote = new Array(provisional.length).fill(null);
+    const candIdx = new Map(); // index -> 宣言による親の番号（存在・部屋の検証済み）
+    provisional.forEach((p, i) => {
+      const d = declaredOf(fieldsList[i]);
+      if (d === null) return;
+      if (!idxByNum.has(d)) { parentNote[i] = `宣言された親 #${d} は見つかりません`; return; }
+      if (provisional[idxByNum.get(d)].room !== p.room) { parentNote[i] = '親は別の部屋です'; return; }
+      candIdx.set(i, d);
+    });
+    // 循環検出：候補を辿って輪に入っている Issue は候補を取り消す。
+    // 輪の外から輪を指す Issue は、輪側が親なしになることで辿れるようになるため残す。
+    const cyclic = new Set();
+    for (const start of candIdx.keys()) {
+      const seen = new Map();
+      const path = [];
+      let cur = start;
+      while (cur !== undefined && candIdx.has(cur)) {
+        if (seen.has(cur)) {
+          for (let k = seen.get(cur); k < path.length; k++) cyclic.add(path[k]);
+          break;
+        }
+        seen.set(cur, path.length);
+        path.push(cur);
+        cur = idxByNum.get(candIdx.get(cur));
+      }
+    }
+    for (const i of cyclic) { candIdx.delete(i); parentNote[i] = '親が循環しています'; }
+    provisional.forEach((p, i) => {
+      if (declaredOf(fieldsList[i]) !== null) {
+        resolvedParent[i] = candIdx.has(i) ? candIdx.get(i) : null;
+      } else if (p.parent != null) {
+        resolvedParent[i] = p.parent;
+        parentNote[i] = 'リンクのみ（宣言なし）';
+      }
+    });
+    const childrenOf = {};
+    provisional.forEach((p, i) => {
+      const par = resolvedParent[i];
+      if (par != null) (childrenOf[par] = childrenOf[par] || []).push(p.iss.number);
+    });
+
     const preChecks = await mapPool(provisional, 6, async p => {
       if (p.status !== 'waiting_review') return null;
       const comments = await ghJson(cfg, `/repos/${cfg.repo}/issues/${p.iss.number}/comments?per_page=100`);
@@ -198,7 +254,7 @@
     });
 
     const issues = provisional.map((p, i) => {
-      const f = parseBody(p.iss.body || '');
+      const f = fieldsList[i];
       const chat = f['チャット'] ? extractUrl(f['チャット']) : null;
       const reportTo = f['報告先']
         ? (() => { const u = extractUrl(f['報告先']); return { name: u.label, chat: u.url }; })()
@@ -213,7 +269,8 @@
         status: p.status,
         hidden: p.hidden,
         room: p.room,
-        parent: p.parent,
+        parent: resolvedParent[i],
+        parentNote: parentNote[i],
         children: childrenOf[p.iss.number] || [],
         assignee: f['担当'] || null,
         chat,
