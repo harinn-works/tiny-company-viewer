@@ -54,7 +54,7 @@
   async function getRepoFile(cfg, p) {
     const r = await gh(cfg, contentsUrl(cfg, p));
     if (r.status === 404) return null;
-    if (!r.ok) throw new Error(`GitHub GET contents ${p} -> ${r.status}`);
+    if (!r.ok) { const e = new Error(`GitHub GET contents ${p} -> ${r.status}`); e.status = r.status; throw e; }
     const j = await r.json();
     return { text: b64decodeText(j.content), sha: j.sha };
   }
@@ -173,7 +173,6 @@
     });
 
     const roomPrefix = (settings.labelPrefixes && settings.labelPrefixes.room) || 'room:';
-    const rolePrefix = (settings.labelPrefixes && settings.labelPrefixes.role) || 'role:';
 
     const provisional = list.map((iss, i) => {
       const labelNames = (iss.labels || []).map(l => (typeof l === 'string' ? l : l.name));
@@ -241,12 +240,6 @@
         parentNote[i] = 'リンクのみ（宣言なし）';
       }
     });
-    const childrenOf = {};
-    provisional.forEach((p, i) => {
-      const par = resolvedParent[i];
-      if (par != null) (childrenOf[par] = childrenOf[par] || []).push(p.iss.number);
-    });
-
     const preChecks = await mapPool(provisional, 6, async p => {
       if (p.status !== 'waiting_review') return null;
       const comments = await ghJson(cfg, `/repos/${cfg.repo}/issues/${p.iss.number}/comments?per_page=100`);
@@ -271,13 +264,11 @@
         room: p.room,
         parent: resolvedParent[i],
         parentNote: parentNote[i],
-        children: childrenOf[p.iss.number] || [],
         assignee: f['担当'] || null,
         chat,
         out: f['成果物'] || null,
         ask: f['承認待ちの内容'] && !/^なし([。、（(]|$)/.test(f['承認待ちの内容']) ? f['承認待ちの内容'] : null,
         reportTo,
-        reportText: f['報告文'] || null,
         preCheck: preChecks[i],
         body: p.iss.body || '',
       };
@@ -351,9 +342,35 @@
     return { ok: true, commit: j.commit && j.commit.sha };
   }
 
+  // 接続の検証。失敗は種類（kind）つきで投げ、画面側が種類ごとに案内を出し分ける。
+  // kind: repo=リポジトリが見つからない（アクセス権なしも GitHub は 404 を返す）／
+  // token=トークンが無効／network=通信できない／nosettings=会社の設定ファイルがない／
+  // other=判別できない（ステータスつき）
   async function validate(cfg) {
-    const f = await getRepoFile(cfg, 'board/settings.json');
-    if (!f) throw new Error('会社リポジトリに board/settings.json が見つかりません');
+    const fail = (kind, status) => {
+      const e = new Error('validate failed: ' + kind);
+      e.kind = kind;
+      if (status) e.status = status;
+      throw e;
+    };
+    let r;
+    try {
+      r = await gh(cfg, `/repos/${cfg.repo}`);
+    } catch (e) {
+      fail('network');
+    }
+    if (r.status === 404) fail('repo');
+    if (r.status === 401) fail('token');
+    if (!r.ok) fail('other', r.status);
+    let f;
+    try {
+      f = await getRepoFile(cfg, 'board/settings.json');
+    } catch (e) {
+      if (e && e.status === 401) fail('token');
+      if (e && e.status) fail('other', e.status);
+      fail('network');
+    }
+    if (!f) fail('nosettings');
     return true;
   }
 
