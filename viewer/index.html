@@ -365,10 +365,10 @@ let BUILDING = {
   version: 2,
   director: { issue: 101 },
   rooms: [
-    { id: 'lp',        name: 'LP制作',        slot: 0, archived: false },
-    { id: 'housetodo', name: 'HouseToDo開発', slot: 1, archived: false },
-    { id: 'old-portfolio', name: '旧ポートフォリオ', slot: 2, archived: false },
-    { id: 'free', name: 'フリー部屋', slot: 3, archived: false }
+    { id: 'lp',        name: 'LP制作',        slot: 0 },
+    { id: 'housetodo', name: 'HouseToDo開発', slot: 1 },
+    { id: 'old-portfolio', name: '旧ポートフォリオ', slot: 2 },
+    { id: 'free', name: 'フリー部屋', slot: 3 }
   ]
 };
 // lp = 手動配置ずみ / housetodo = 構造だけ（座標なし→自動レイアウト）
@@ -808,7 +808,6 @@ function makePlates(text, gold = false) {
   const grp = new THREE.Group();
   const full = plateSpriteFrom(lines, gold);
   grp.add(full);
-  grp.userData.plates = { full, fullW: full.userData.worldW };
   return grp;
 }
 const textMeasureCtx = document.createElement('canvas').getContext('2d');
@@ -983,7 +982,6 @@ function person(parent, x, z, rotY, issue, tierIssue) {
   const plate = makePlates(info.title, info.role === 'director');
   plate.position.set(0, 1.66, 0);
   g.add(plate);
-  g.userData.plates = plate.userData.plates;
   const poseStatus = closedFig ? null : info.status;
   let bang = null;
   if (poseStatus === 'waiting_approval') {
