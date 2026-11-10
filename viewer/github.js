@@ -103,7 +103,7 @@
   }
   function extractUrl(text) {
     if (!text) return { label: text, url: null };
-    const m = text.match(/https?:\/\/[^\s）)]+/);
+    const m = text.match(/(?:https?|codex):\/\/[^\s）)]+/);
     if (!m) return { label: text, url: null };
     const label = (text.slice(0, m.index) + text.slice(m.index + m[0].length)).trim() || m[0];
     return { label, url: m[0] };
