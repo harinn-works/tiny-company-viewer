@@ -310,7 +310,7 @@
   <div class="ttl" id="dTitle"></div>
   <div class="row"><b>状態</b><span id="dStatus"></span></div>
   <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
-  <div class="row"><b>担当</b><span id="dName"></span></div>
+  <div class="row"><b>担当</b><span id="dName"></span><span id="dSeatNote" class="pNote" style="display:none"></span></div>
   <div class="row"><b>最終更新</b><span id="dUpdated"></span></div>
   <div class="row" id="dParentRow" style="display:none"><b>親</b><span id="dParent"></span><span id="dParentNote" class="pNote" style="display:none"></span></div>
   <div class="row" id="dProgRow" style="display:none"><b>子Issue</b><span id="dProg"></span></div>
@@ -1529,6 +1529,16 @@ function showDetail(info, anchorWorld) {
     }
   } else {
     prow.style.display = 'none';
+  }
+  // seat 欠けの注記は担当の行にだけ小さく出す（親の注記と同方式。#50）
+  const sNoteEl = document.getElementById('dSeatNote');
+  const sNote = issue ? issue.seatNote : null;
+  if (sNote) {
+    sNoteEl.style.display = '';
+    sNoteEl.textContent = sNote;
+  } else {
+    sNoteEl.style.display = 'none';
+    sNoteEl.textContent = '';
   }
   document.getElementById('dUpdated').textContent =
     issue && issue.updatedAt ? fmtUpdated(issue.updatedAt) : '—';
