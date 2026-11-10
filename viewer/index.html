@@ -1239,7 +1239,7 @@ const ROOM_ACCENTS = [0x9cc184, 0x7ea6c9, 0xd98cb3, 0x8fb8ad];
 // ===== 表示判定（人と部屋で共通化） =====
 // 人：自分の「非表示」ラベルで消える。部屋：部長（管理Issue）の表示状態に従う。
 // 部長がいない部屋は未開始として表示し、フリー部屋は常時表示する。
-let editShowAll = false; // 編集モードでは全室表示する
+// 編集モードでも可視性は通常表示と同じ（#54 本人指示。全室表示は廃止）
 function roomHidden(roomId) {
   if (roomId === 'free') return false;
   const mgrs = ISSUES.filter(i => i.room === roomId && i.bucho);
@@ -1247,7 +1247,7 @@ function roomHidden(roomId) {
   return mgrs.every(m => m.hidden); // 部長全員が非表示のときだけ部屋が終わる
 }
 function personHidden(issue) { return !!issue.hidden || (issue.room ? roomHidden(issue.room) : false); }
-const visibleRooms = () => BUILDING.rooms.filter(r => editShowAll || !roomHidden(r.id)).sort((a, b) => a.slot - b.slot);
+const visibleRooms = () => BUILDING.rooms.filter(r => !roomHidden(r.id)).sort((a, b) => a.slot - b.slot);
 const roomBoxW = room => (LAYOUTS[room.id] ? LAYOUTS[room.id].size.w : 10.6) + 1.2;
 const roomBoxD = room => (LAYOUTS[room.id] ? LAYOUTS[room.id].size.d : 8.6) + 1.2;
 
@@ -2064,15 +2064,10 @@ if (!entering && editDirty()) {
 }
 setEditMode(!editMode);
 if (entering) {
-  // 編集モードでは全室表示する：表示フラグを立ててからビューを作り直し、編集UIを戻す
-  editShowAll = true;
-  const k = currentViewKey;
-  switchView(k);
-  setEditMode(true);
-  editBaseline = snapshotEditState(); // 作り直し後の状態を未保存チェックの基準にする
+  // 編集モードでも部屋の可視性は通常表示と同じなので、ビューの作り直しは不要（#54）
+  editBaseline = snapshotEditState(); // 未保存チェックの基準にする
   buildTabs();
 } else {
-  editShowAll = false;
   editBaseline = null;
   if (roomHidden(currentViewKey)) switchView('all');
   else buildTabs();
@@ -2107,7 +2102,7 @@ editbar.append(
 mkBtn('＋ 部屋を追加', addRoom),
 mkBtn('配置を保存', saveBuilding, 'saveBtn')
 );
-note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります。編集モードでは、非表示の部屋も含めて全部表示されます';
+note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります';
 }
 editbar.appendChild(note);
 }
@@ -2241,8 +2236,15 @@ const sorted = [...buildingRoomGroups].sort((a, b) => {
 const ra = Math.round(a.position.z / gridCell.d), rb = Math.round(b.position.z / gridCell.d);
 return ra !== rb ? ra - rb : a.position.x - b.position.x;
 });
-sorted.forEach((g, i) => {
-const room = BUILDING.rooms.find(r => r.id === g.userData.roomId);
+// 非表示の部屋はシーンに無く採番対象外になるため、旧 slot の位置を保ったまま
+// 表示中の部屋だけ新しい並び順で差し込み、全室で slot が重ならないようにする（#54）
+const newVisibleOrder = sorted.map(g => g.userData.roomId);
+const inScene = new Set(newVisibleOrder);
+const oldOrder = [...BUILDING.rooms].sort((a, b) => a.slot - b.slot);
+let vi = 0;
+const mergedOrder = oldOrder.map(r => inScene.has(r.id) ? newVisibleOrder[vi++] : r.id);
+mergedOrder.forEach((id, i) => {
+const room = BUILDING.rooms.find(r => r.id === id);
 if (room) room.slot = i;
 });
 packBuilding();
