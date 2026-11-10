@@ -122,7 +122,7 @@
     padding:9px 16px; border-radius:999px; color:#273A34;
     background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(0,0,0,.1);
   }
-  #editToggle.on { background:#d9a441; color:#fff; }
+  #editToggle.on { background:rgba(255,255,255,.9); color:#273A34; }
   #editbar {
     position:fixed; right:12px; top:58px; z-index:6; display:none;
     background:rgba(255,255,255,.95); border-radius:12px; padding:10px;
@@ -133,6 +133,7 @@
     font-size:13px; font-weight:600; padding:8px 0; border-radius:8px;
     background:#eef3f0; color:#273A34;
   }
+  #editbar button.saveBtn { background:#356A59; color:#fff; }
   #editbar .note { font-size:11px; color:#7d8a8a; line-height:1.5; }
   #editbar .sep { border-top:1px solid #E3E9E4; margin:8px 0; }
   #modeToggle { margin-top:8px; display:flex; gap:6px; }
@@ -1517,8 +1518,19 @@ function showDetail(info, anchorWorld) {
   if (issue && (issue.parent || pNote)) {
     const p = issue.parent ? issueByNum(issue.parent) : null;
     prow.style.display = '';
-    document.getElementById('dParent').textContent =
-      issue.parent ? (p ? `#${p.number} ${p.title}` : '#' + issue.parent) : '';
+    const pEl = document.getElementById('dParent');
+    pEl.textContent = '';
+    if (p) {
+      // 親はリンクにし、押すとその親 Issue の詳細へ切り替える（#51）
+      const a = document.createElement('a');
+      a.href = '#';
+      a.className = 'lnk';
+      a.textContent = `#${p.number} ${p.title}`;
+      a.addEventListener('click', e => { e.preventDefault(); showDetail(infoOf(p), detailAnchor); });
+      pEl.appendChild(a);
+    } else if (issue.parent) {
+      pEl.textContent = '#' + issue.parent;
+    }
     // 親宣言の注記（無効な宣言の理由／リンクのみの橋渡し）は親の行にだけ小さく出す（設計B、#46）
     if (pNote) {
       pNoteEl.style.display = '';
@@ -2050,9 +2062,10 @@ if (entering) {
   else buildTabs();
 }
 });
-function mkBtn(label, fn) {
+function mkBtn(label, fn, cls) {
 const b = document.createElement('button');
 b.textContent = label;
+if (cls) b.className = cls;
 b.addEventListener('click', fn);
 return b;
 }
@@ -2070,15 +2083,19 @@ mkBtn('⟳ 回転（島）', () => { if (selected && selected.userData.isIsland)
 mkBtn('🗑 削除（島・机）', deleteSelectedIsland),
 mkBtn('🗑 部署を削除（選択中）', deleteSelectedDepartment),
 mkBtn('✨ 自動整列', autoArrange),
-mkBtn('レイアウトを保存', saveLayout)
+mkBtn('レイアウトを保存', saveLayout, 'saveBtn')
 );
 note.textContent = '島・部署エリアをドラッグで移動。部署の角の■を引くと大きさ変更。動かしたものは手動配置として保持されます';
 } else if (currentViewKey === 'all') {
 editbar.append(
 mkBtn('＋ 部屋を追加', addRoom),
-mkBtn('配置を保存', saveBuilding)
+mkBtn('配置を保存', saveBuilding, 'saveBtn')
 );
 note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります。編集モードでは、非表示の部屋も含めて全部表示されます';
+const draftNote = document.createElement('div');
+draftNote.className = 'note';
+draftNote.textContent = 'ビューアで追加した部屋は下書きです。正式な追加には、GitHub 側でその部屋の RULES.md などの用意が必要です';
+editbar.appendChild(draftNote);
 }
 editbar.appendChild(note);
 }
