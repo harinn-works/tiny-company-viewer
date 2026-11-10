@@ -15,7 +15,6 @@
     } catch { return null; }
   }
   function saveConfig(c) { localStorage.setItem(LS_KEY, JSON.stringify(c)); }
-  function clearConfig() { localStorage.removeItem(LS_KEY); }
 
   // ---------- GitHub 層 ----------
   function apiBase(cfg) { return (cfg.apiBase || 'https://api.github.com').replace(/\/$/, ''); }
@@ -188,7 +187,6 @@
           const rl = labelNames.find(n => n.startsWith(roomPrefix));
           return rl ? rl.slice(roomPrefix.length) : null;
         })(),
-        roles: labelNames.filter(n => n.startsWith(rolePrefix)).map(n => n.slice(rolePrefix.length)),
         hidden: labelNames.includes('非表示'),
       };
     });
@@ -215,7 +213,6 @@
         status: p.status,
         hidden: p.hidden,
         room: p.room,
-        roles: p.roles,
         parent: p.parent,
         children: childrenOf[p.iss.number] || [],
         assignee: f['担当'] || null,
@@ -303,5 +300,5 @@
     return true;
   }
 
-  window.TCGitHub = { getConfig, saveConfig, clearConfig, loadCompany, saveFile, validate, probeChanges, setIssueHidden };
+  window.TCGitHub = { getConfig, saveConfig, loadCompany, saveFile, validate, probeChanges, setIssueHidden };
 })();
