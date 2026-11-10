@@ -35,6 +35,37 @@
     if (!r.ok) throw new Error(`GitHub GET ${pathname} -> ${r.status}`);
     return r.json();
   }
+  // 一覧 API の全ページ取得。per_page の上限（100件）を超える分は Link ヘッダの
+  // rel="next" を辿って逐次取得し、取得順のまま結合する（件数に上限を設けない）。
+  // 取得の合間に新規 Issue が作られるとページ境界がずれて同じ Issue が2ページに
+  // 現れうるため、番号で重複を取り除く。途中のページが失敗したら、部分データで
+  // 描画せず例外を投げて呼び出し側のエラー経路に倒す。
+  async function ghJsonAllPages(cfg, pathname) {
+    const perPage = 100;
+    const sep = pathname.includes('?') ? '&' : '?';
+    const out = [];
+    const seen = new Set();
+    for (let page = 1; ; page++) {
+      const r = await gh(cfg, `${pathname}${sep}page=${page}`);
+      if (!r.ok) throw new Error(`GitHub GET ${pathname} (page ${page}) -> ${r.status}`);
+      const items = await r.json();
+      let added = 0;
+      for (const it of items) {
+        if (it && typeof it.number === 'number') {
+          if (seen.has(it.number)) continue;
+          seen.add(it.number);
+        }
+        out.push(it);
+        added++;
+      }
+      const link = (r.headers && r.headers.get('Link')) || '';
+      const hasNext = link
+        ? link.split(',').some(p => /rel="next"/.test(p))
+        : items.length === perPage && added > 0;
+      if (!hasNext) break;
+    }
+    return out;
+  }
   const contentsUrl = (cfg, p) =>
     `/repos/${cfg.repo}/contents/${p.split('/').map(encodeURIComponent).join('/')}`;
   function b64decodeText(b64) {
@@ -160,7 +191,7 @@
       if (f) layouts[room.id] = JSON.parse(f.text);
     }
 
-    const raw = await ghJson(cfg, `/repos/${cfg.repo}/issues?state=all&per_page=100`);
+    const raw = await ghJsonAllPages(cfg, `/repos/${cfg.repo}/issues?state=all&per_page=100`);
     const list = raw.filter(i => !i.pull_request);
 
     // サブIssueリンクの親。階層の正ではなくなったが、本文の「親」宣言が無い
