@@ -2730,10 +2730,10 @@ async function autoRefreshTick() {
   finally { autoRefreshing = false; }
 }
 window.autoRefreshTick = autoRefreshTick;
-// 7秒ごとに「変わったか」だけを ETag で確認する（変更なしの応答は回数制限に数えられない）。
+// 5秒ごとに「変わったか」だけを ETag で確認する（変更なしの応答は回数制限に数えられない）。
 // 見張りはタブが裏でも止めない（裏ではブラウザのタイマー間引きで間隔が伸びる）。
 // 重い全取得は「見えているとき」だけ行い、裏で検知した変更はタブに戻った時点で取り込む。
-// 全取得どうしの間隔は最低10秒あける。120秒ごとの全取得は、見張りで拾えない変化のための安全網。
+// 変更を見つけたら間引きせず即反映する（全取得どうしの間隔は最低3秒だけあける）。120秒ごとの全取得は、見張りで拾えない変化のための安全網。
 let probePending = false;
 let probing = false;
 async function probeTick() {
@@ -2748,13 +2748,13 @@ async function probeTick() {
     if (await TCGitHub.probeChanges(cfg)) probePending = true;
   } catch (e) { /* 見張りの失敗は静かに無視する（安全網の全取得に任せる） */ }
   finally { probing = false; }
-  if (probePending && !document.hidden && Date.now() - lastFullRefreshAt >= 10000) {
+  if (probePending && !document.hidden && Date.now() - lastFullRefreshAt >= 3000) {
     probePending = false;
     autoRefreshTick();
   }
 }
 window.probeTick = probeTick;
-setInterval(probeTick, 7000);
+setInterval(probeTick, 5000);
 setInterval(autoRefreshTick, 120000);
 // タブに戻った瞬間にも見張りを1回かける（裏にいる間のタイマー間引き対策）
 document.addEventListener('visibilitychange', () => { if (!document.hidden) probeTick(); });
