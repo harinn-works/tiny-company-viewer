@@ -1526,7 +1526,23 @@ function showDetail(info, anchorWorld) {
       a.href = '#';
       a.className = 'lnk';
       a.textContent = `#${p.number} ${p.title}`;
-      a.addEventListener('click', e => { e.preventDefault(); showDetail(infoOf(p), detailAnchor); });
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        // 親のキャラクターが現在のシーンにいれば、キャラクターをクリックしたときと
+        // 同じ経路で選択し、選択リングも親へ移す（#52）。いなければ詳細だけ切り替える
+        const target = clickables.find(o => {
+          const inf = o.userData && o.userData.info;
+          return inf && (inf.number === p.number || (inf.tasks || []).some(t => t.number === p.number));
+        });
+        if (target && target.userData.anchorLocal && target.userData.anchorGroup) {
+          const v = new THREE.Vector3(target.userData.anchorLocal.x, 0, target.userData.anchorLocal.z);
+          target.userData.anchorGroup.updateWorldMatrix(true, false);
+          target.userData.anchorGroup.localToWorld(v);
+          showDetail(infoOf(p), v);
+        } else {
+          showDetail(infoOf(p), detailAnchor);
+        }
+      });
       pEl.appendChild(a);
     } else if (issue.parent) {
       pEl.textContent = '#' + issue.parent;
@@ -2092,10 +2108,6 @@ mkBtn('＋ 部屋を追加', addRoom),
 mkBtn('配置を保存', saveBuilding, 'saveBtn')
 );
 note.textContent = '部屋をドラッグすると並び替え。部屋の表示・非表示は部長の「非表示」ラベルで決まります。編集モードでは、非表示の部屋も含めて全部表示されます';
-const draftNote = document.createElement('div');
-draftNote.className = 'note';
-draftNote.textContent = 'ビューアで追加した部屋は下書きです。正式な追加には、GitHub 側でその部屋の RULES.md などの用意が必要です';
-editbar.appendChild(draftNote);
 }
 editbar.appendChild(note);
 }
