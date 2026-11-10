@@ -62,6 +62,7 @@
   #detail .taskRow { display:flex; align-items:center; gap:6px; padding:3px 6px; margin:0 -6px; border-radius:6px; cursor:pointer; }
   #detail .taskRow:hover { text-decoration:underline; }
   #detail .taskRow.cur { font-weight:700; cursor:default; text-decoration:none; background:#F4F6F3; }
+  #detail .pNote { font-size:11px; color:#7d8a8a; margin-left:6px; }
   #detail .taskMore { padding:3px 6px; margin:0 -6px; color:#356A59; font-size:13px; font-weight:600; cursor:pointer; }
   #detail .taskMore:hover { text-decoration:underline; }
   #detail .checkLine { margin-top:12px; border-top:1px solid #E3E9E4; padding-top:8px; line-height:1.65; }
@@ -307,7 +308,7 @@
   <div class="sec ask" id="dAskSec" style="display:none"><div class="secT">承認待ちの内容</div><div id="dAsk"></div></div>
   <div class="row"><b>担当</b><span id="dName"></span></div>
   <div class="row"><b>最終更新</b><span id="dUpdated"></span></div>
-  <div class="row" id="dParentRow" style="display:none"><b>親</b><span id="dParent"></span></div>
+  <div class="row" id="dParentRow" style="display:none"><b>親</b><span id="dParent"></span><span id="dParentNote" class="pNote" style="display:none"></span></div>
   <div class="row" id="dProgRow" style="display:none"><b>子Issue</b><span id="dProg"></span></div>
   <div class="row"><b>成果物</b><span id="dOut"></span></div>
   <div class="row" id="dTasksRow" style="display:none"><b>この人のタスク</b><span id="dTasks"></span><div id="dTasksMore" class="taskMore" style="display:none"></div></div>
@@ -1509,11 +1510,21 @@ function showDetail(info, anchorWorld) {
     dIssueEl.removeAttribute('rel');
   }
   const prow = document.getElementById('dParentRow');
-  if (issue && issue.parent) {
-    const p = issueByNum(issue.parent);
+  const pNoteEl = document.getElementById('dParentNote');
+  const pNote = issue ? issue.parentNote : null;
+  if (issue && (issue.parent || pNote)) {
+    const p = issue.parent ? issueByNum(issue.parent) : null;
     prow.style.display = '';
     document.getElementById('dParent').textContent =
-      p ? `#${p.number} ${p.title}` : '#' + issue.parent;
+      issue.parent ? (p ? `#${p.number} ${p.title}` : '#' + issue.parent) : '';
+    // 親宣言の注記（無効な宣言の理由／リンクのみの橋渡し）は親の行にだけ小さく出す（設計B、#46）
+    if (pNote) {
+      pNoteEl.style.display = '';
+      pNoteEl.textContent = `（${pNote}）`;
+    } else {
+      pNoteEl.style.display = 'none';
+      pNoteEl.textContent = '';
+    }
   } else {
     prow.style.display = 'none';
   }
