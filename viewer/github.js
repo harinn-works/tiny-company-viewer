@@ -252,6 +252,15 @@
       const reportTo = f['報告先']
         ? (() => { const u = extractUrl(f['報告先']); return { name: u.label, chat: u.url }; })()
         : null;
+      // seat 欠けの検知（#50）：部屋ラベルとチャット URL があるのに seat ラベルが
+      // 無い Issue は、その人がビューアに一切表示されず異常に気づけない（2026-11-10
+      // の実例）。親の注記（parentNote）と同方式で、詳細パネルにだけ出す注記を持たせる。
+      // 部屋に属さない Issue（社長・秘書の常設など room が無いもの）と、チャット
+      // URL の無い Issue（人ではないもの）は対象にしない。seat ラベルの値が
+      // settings の定義に無い場合も seat が null になるため、打ち間違いも拾える。
+      const seatNote = p.room && chat && chat.url && !p.seat
+        ? 'seat ラベルがありません。この Issue はボードに表示されません'
+        : null;
       return {
         number: p.iss.number,
         title: p.iss.title,
@@ -259,6 +268,7 @@
         url: p.iss.html_url,
         updatedAt: p.iss.updated_at || null,
         seat: p.seat,
+        seatNote,
         status: p.status,
         hidden: p.hidden,
         room: p.room,
