@@ -29,22 +29,34 @@ TinyCompany の会社 repo（GitHub）を表示するビューアです。
 
 ### 複数の PC で見る場合
 
-PC（ブラウザ）ごとに、最初の接続を1回だけ行います。データは GitHub にあるので、どの PC から見ても同じ最新の状態です。トークンは PC ごとに分けて作ると、不要になった PC の分だけを消せて安全です。
+PC（ブラウザ）ごとに、最初の接続を1回だけ行います。データは GitHub にあるので、どの PC から見ても同じ最新の状態です。トークンは、会社の鍵として**1本だけ**発行し、どの PC でも同じ鍵を使い回します（PC ごとに作り直しません）。各 PC では、鍵ファイルから取り込むか、同じトークンを入力して接続します。
 
-## トークンの用意
+### 複数の会社を見る場合
 
-GitHub の Settings → Developer settings → Personal access tokens → **Fine-grained tokens** で、対象の会社 repo だけに絞ったトークンを作ります。
+ビューアが保持できる接続は、開く場所（URL）ごとに1社分だけです。別の会社を見る場合は、その会社のリポジトリと鍵で接続し直してください（鍵ファイルは会社ごとに分かれています）。
+
+## トークンの用意（会社の鍵）
+
+会社の鍵は、TinyCompany 用に**1本だけ**発行し、ビューア・フック・拡張など全ての道具で使い回すのが決まりです。GitHub の Settings → Developer settings → Personal access tokens → **Fine-grained tokens** で、対象の会社 repo だけに絞ったトークンを作ります。
 
 - Resource owner：会社 repo のある owner
 - Repository access：**Only select repositories** で会社 repo だけを選択
 - Repository permissions：**Issues = Read and write**、**Contents = Read and write**（Metadata は自動で Read-only）
+- 有効期限：選べる範囲の長め（例：90日、または用意されている最長）を目安にします
 
-トークンは、入力したブラウザの中（localStorage）にだけ保存されます。ビューアのコードや会社 repo にトークンが含まれることはありません。
+発行したトークンは、鍵ファイル（`tinycompany-token` で始まる名前のファイル。既定名は `tinycompany-token`、推奨の置き場所はホーム側の `~/.tinycompany/` フォルダ）に、トークンだけを1行で書いて保存します。ビューアへは、初回にこの鍵ファイルから取り込めます（トークンを直接入力しても同じです）。取り込んだ内容はブラウザの中（localStorage）にだけ保存され、ビューアのコードや会社 repo にトークンが含まれることはありません。
+
+鍵の期限が切れたら、同じ設定で新しいトークンを発行し、鍵ファイルの中身を差し替えて、ビューアでもう一度取り込みます。
+
+## 動作環境と想定
+
+- WebGL に対応したモダンブラウザで開いてください。3D 表示が重い端末では、付箋ボードの表示でも仕事の状態は確認できます。
+- 想定しているのは、利用者1人が管理する小規模な会社です。Issue が大量にある会社では、読み込みに時間がかかることがあります。
 
 ## 安全についての注意
 
 - トークンには会社 repo の書き込み権限があります。入力するのは、必ず自分が用意したビューアのページだけにしてください（URL を確認すること）。
-- トークンは会社 repo 1つだけに絞ること。使い終わった PC のトークンは GitHub 側で削除してください。
+- トークンは会社 repo 1つだけに絞ること。鍵が漏れた疑いがある場合は、GitHub 側でそのトークンを失効させ、新しい鍵を発行して、鍵ファイルの差し替えと各道具への再取り込みを行ってください。
 - ページを公開ホスティングに置く場合、ページ自体は公開されても、トークンは各利用者のブラウザ内にしか入らないため、他人のトークンが混ざることはありません。
 
 ## 構成
@@ -53,17 +65,4 @@ GitHub の Settings → Developer settings → Personal access tokens → **Fine
 - `viewer/github.js` — ブラウザから GitHub API へ接続し、会社データを整形する層（接続情報は localStorage）
 - `viewer/vendor/` — three.js（同梱。CDN には依存しない）
 - `start-viewer.bat` / `start-viewer.command` / `start-viewer.sh` — ダブルクリック起動用のランチャー。Windows 版は `tools/static-server.ps1`（Windows 標準機能だけの最小静的サーバー）を使う
-- `server/` — 従来方式のローカルサーバー（任意）。トークンをブラウザに入れたくない場合や、常駐表示したい場合はこちらも使えます。使い方は `server/server.mjs` 冒頭と `docker-compose.yml` を参照
-
-## 開発者向け
-
-GitHub API のスタブで、実 repo を使わずに動作確認できます。スタブは CORS に対応しているので、ブラウザ完結ビューアから直接叩けます。
-
-```bash
-cp -r server/test/fixtures-sample server/test/fixtures   # サンプルの会社データ一式
-node server/test/stub.mjs &                 # スタブ（ポート 8791）
-# 静的サーバーで viewer/ を配信して開き、接続画面の詳細設定で
-# API の URL に http://127.0.0.1:8791 を指定する（トークンは任意の文字列でよい）
-```
-
-ビューアとデータ層の間のデータ形式は `server/CONTRACT.md` に定義しています（ブラウザ完結版も同じ形を使います）。
+- `CHANGELOG.md` — ビューアの変更履歴
