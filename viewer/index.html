@@ -242,6 +242,9 @@
   #connKeyFile { position:absolute; width:1px; height:1px; opacity:0; }
   .keyImportHint { color:#7d8a8a; font-size:12px; margin:6px 0 0; line-height:1.6; font-weight:400; }
   #connKeyMsg { color:#356A59; margin-top:8px; display:none; }
+  .tokenMethod { margin-top:14px; display:flex; gap:18px; flex-wrap:wrap; }
+  .tokenMethod label { display:inline-flex; align-items:center; gap:6px; margin:0; cursor:pointer; }
+  .tokenMethod input { display:inline-block; width:auto; margin:0; padding:0; }
   .connectHelp { color:#7d8a8a; font-size:12px; margin-top:14px; line-height:1.6; }
   #connBox { border-top:1px solid #E3E9E4; margin-top:14px; padding-top:12px; }
   #connBox .ttl2 { font-weight:700; margin-bottom:4px; }
@@ -267,14 +270,18 @@
 <div id="connectOverlay">
   <div class="connectCard">
     <div class="ttl">会社に接続する</div>
-    <p>会社リポジトリ（GitHub）と、そのリポジトリ専用のトークンを入力してください。トークンはこのブラウザの中にだけ保存されます。</p>
-    <div class="keyImport">
+    <p>会社リポジトリ（GitHub）を入力し、そのリポジトリ専用のトークンを鍵ファイルから取り込むか、直接入力してください。トークンはこのブラウザの中にだけ保存されます。</p>
+    <div class="tokenMethod" role="radiogroup" aria-label="トークンの入れ方">
+      <label><input type="radio" name="connTokenMethod" value="file" checked>鍵ファイルから取り込む（推奨）</label>
+      <label><input type="radio" name="connTokenMethod" value="direct">直接入力する</label>
+    </div>
+    <div class="keyImport" id="connKeyImport">
       <label id="connKeyLabel">鍵ファイルから取り込む<input id="connKeyFile" type="file"></label>
-      <p class="keyImportHint">会社の鍵ファイルを選ぶと、下の欄に自動で入ります。鍵ファイルは、トークンだけを書いたテキストファイル、または {"token": "...", "repo": "owner/repository"} の形の JSON ファイルです。</p>
+      <p class="keyImportHint">会社の鍵ファイルを選ぶと、トークンが取り込まれます。鍵ファイルは通常、ホームフォルダの `.tinycompany` フォルダにあります。トークンだけを書いたテキストファイル、または {"token": "...", "repo": "owner/repository"} の形の JSON ファイルです。</p>
       <div id="connKeyMsg"></div>
     </div>
     <label>会社リポジトリ<input id="connRepo" placeholder="owner/repository" autocomplete="off"></label>
-    <label>トークン<input id="connToken" type="password" placeholder="github_pat_..." autocomplete="off"></label>
+    <label id="connTokenLabel" style="display:none">トークン<input id="connToken" type="password" placeholder="github_pat_..." autocomplete="off"></label>
     <details>
       <summary>詳細設定（通常は不要です）</summary>
       <label>API の URL<input id="connApi" placeholder="https://api.github.com" autocomplete="off"></label>
@@ -284,7 +291,7 @@
       <button id="connConnect">接続する</button>
       <button id="connCancel">あとで</button>
     </div>
-    <p class="connectHelp">トークンの作り方：GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で、対象の会社リポジトリだけを選び、Repository permissions の Issues と Contents を Read and write にします。トークンは「会社の鍵」として1本だけ作り、鍵ファイル（tinycompany-token）に保存して、他の道具とも使い回します。鍵ファイルを選んで取り込むと、下の欄に入ります。</p>
+    <p class="connectHelp">トークンの作り方：GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で、対象の会社リポジトリだけを選び、Repository permissions の Issues と Contents を Read and write にします。トークンは「会社の鍵」として1本だけ作り、鍵ファイル（tinycompany-token）に保存して、他の道具とも使い回します。鍵ファイルから取り込むと、トークンを手で入力せずに接続できます。</p>
   </div>
 </div>
 <div class="panel" id="infoPanel">
@@ -2853,6 +2860,7 @@ function openConnect() {
   document.getElementById('connError').style.display = 'none';
   const km = document.getElementById('connKeyMsg');
   if (km) { km.textContent = ''; km.style.display = 'none'; }
+  setTokenMethod('file');
   connectOverlay.classList.add('open');
 }
 function closeConnect() { connectOverlay.classList.remove('open'); }
@@ -2873,7 +2881,7 @@ function applyKeyFileText(text) {
     document.getElementById('connToken').value = token;
     if (repo) document.getElementById('connRepo').value = repo;
     errEl.style.display = 'none';
-    msgEl.textContent = '鍵ファイルから取り込みました。内容を確認して「接続する」を押してください。';
+    msgEl.textContent = '鍵ファイルから取り込みました。「接続する」を押してください。';
     msgEl.style.display = 'block';
   };
   if (t.startsWith('{')) {
@@ -2889,6 +2897,15 @@ function applyKeyFileText(text) {
   if (/\s/.test(t)) { showConnError(KEY_FILE_HINT); return; }
   setFields(t, '');
 }
+// トークンの入れ方は方法選択式。既定は鍵ファイル取り込みで、トークン入力欄は「直接入力する」のときだけ出す
+function setTokenMethod(method) {
+  document.getElementById('connKeyImport').style.display = method === 'file' ? '' : 'none';
+  document.getElementById('connTokenLabel').style.display = method === 'direct' ? '' : 'none';
+  document.querySelectorAll('input[name="connTokenMethod"]').forEach(r => { r.checked = r.value === method; });
+}
+document.querySelectorAll('input[name="connTokenMethod"]').forEach(r => {
+  r.addEventListener('change', () => { if (r.checked) setTokenMethod(r.value); });
+});
 document.getElementById('connKeyFile').addEventListener('change', async (ev) => {
   const f = ev.target.files && ev.target.files[0];
   ev.target.value = '';
