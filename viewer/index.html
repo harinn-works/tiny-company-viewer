@@ -331,6 +331,7 @@
   <div class="btnMain" id="dMainRow" style="display:none">
     <a href="#" id="dParentChat">報告先のチャットを開く</a>
   </div>
+  <div class="pNote" id="dReportNote" style="display:none"></div>
   <div class="mgmtRow" id="dMgmtRow" style="display:none"><a href="#" id="dHideBtn">キャラを隠す</a></div>
 </div>
 
@@ -1590,6 +1591,15 @@ function showDetail(info, anchorWorld) {
   } else {
     mainRow.style.display = 'none';
     delete pcBtn.dataset.url;
+  }
+  // 確認待ちなのに行き先が決まらないときは、ボタンを黙って消さず注記する（F23）
+  const rNoteEl = document.getElementById('dReportNote');
+  if (!targetChat && issue && info.status === 'waiting_review' && !isClosed) {
+    rNoteEl.style.display = '';
+    rNoteEl.textContent = '報告先が分かりません（「報告先」の記入、親の宣言、親のチャット登録を確認してください）';
+  } else {
+    rNoteEl.style.display = 'none';
+    rNoteEl.textContent = '';
   }
   const hideBtn = document.getElementById('dHideBtn');
   const mgmtRow = document.getElementById('dMgmtRow');
